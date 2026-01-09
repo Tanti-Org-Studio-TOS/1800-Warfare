@@ -6,13 +6,10 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>1800 Warfare: North America</title>
 
-  <!-- Leaflet CSS (MUST use <link>) -->
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-E+oWw2w6iigI0hYVd6hw2yQfR8Gv+K1G7nU1F9gC4ZY="
-    crossorigin=""
-  />
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-o9N1j7kGIC1RkG2GQ0Sx0l1rR2z6jZLLANk3GxC6Q8M="
+        crossorigin="anonymous"/>
 
   <style>
     :root {
@@ -28,7 +25,7 @@
     #map { height: 100vh; }
     #hud {
       position: absolute; top: 10px; left: 10px; z-index: 1000;
-      width: 360px; background: var(--panel); backdrop-filter: blur(4px);
+      width: 380px; background: var(--panel); backdrop-filter: blur(4px);
       border-radius: 10px; padding: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.35);
     }
     #hud .row { display: flex; gap: 8px; align-items: center; }
@@ -65,8 +62,12 @@
       <div><strong>ပိုင်နယ်နိမိတ်</strong>: <span id="ownedCount">0</span></div>
     </div>
     <div class="row space">
-      <button id="endTurnBtn">End Turn</button>
-      <button id="resetBtn">Reset</button>
+      <div style="display:flex; gap:8px;">
+        <button id="endTurnBtn">End Turn</button>
+        <button id="resetBtn">Reset</button>
+      </div>
+      <!-- ✅ Test Modal button -->
+      <button id="testModalBtn" title="Press M to open">Test Modal</button>
     </div>
     <div class="legend" aria-label="Legend">
       <span class="key" style="background:#3a86ff"></span> Player
@@ -79,7 +80,7 @@
   <!-- Map -->
   <div id="map" aria-label="Map of North America in 1800"></div>
 
-  <!-- Modal (initially hidden by class) -->
+  <!-- Modal -->
   <div id="modal" class="hidden" role="dialog" aria-modal="true">
     <div class="modal-card">
       <h3 id="modal-title">သိမ်းမယ်?</h3>
@@ -91,14 +92,12 @@
     </div>
   </div>
 
-  <!-- Leaflet JS (MUST use <script src>) -->
-  <script
-    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-o9N1j8Mk3f2GQpQ2RkGq1iZ9KqGZbxL8G3GuwZf3g2o="
-    crossorigin=""
-  ></script>
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-o9QnB8kV2VQnG6G5Z3zKp0lWJQyqUo4o8GgS5bN3EcQ="
+          crossorigin="anonymous"></script>
 
-  <!-- Turf.js (geospatial ops) -->
+  <!-- Turf.js -->
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
 
   <script>
@@ -116,19 +115,17 @@
       $("ownedCount").textContent=Object.values(state.owners).filter(o=>o==="player").length;
       $("clock").textContent=new Date(state.timeSec*1000).toISOString().substr(14,5); }
 
-    const SAVE_KEY = "warfare1800-na";
+    const SAVE_KEY="warfare1800-na";
     function saveGame(){ localStorage.setItem(SAVE_KEY, JSON.stringify({timeSec:state.timeSec,coins:state.coins,men:state.men,owners:state.owners})); }
-    function loadGame(){
-      const raw=localStorage.getItem(SAVE_KEY); if(!raw) return false;
+    function loadGame(){ const raw=localStorage.getItem(SAVE_KEY); if(!raw) return false;
       try{ const sv=JSON.parse(raw); state.timeSec=sv.timeSec??0; state.coins=sv.coins??60; state.men=sv.men??30; state.owners=sv.owners??{}; log("Save data loaded."); return true; }
-      catch(e){ console.warn(e); return false; }
-    }
+      catch(e){ console.warn(e); return false; } }
 
     function ownerColor(o){ return o==="player"?"#3a86ff":(o==="ai"?"#ef476f":"#94a3b8"); }
     function styleFeature(f){ const code=codeOf(f); const owner=state.owners[code]||"neutral";
       return { color:"#0b1a2a", weight:1, fillColor: ownerColor(owner), fillOpacity:0.55 }; }
 
-    // Modal helpers (make sure it can always close)
+    // --- Modal helpers (always closable & relaunchable) ---
     function openModal(title, bodyHtml, showConquer=false){
       $("modal-title").textContent=title;
       $("modal-body").innerHTML=bodyHtml;
@@ -137,10 +134,15 @@
     }
     function closeModal(){ $("modal").classList.add("hidden"); state.selectedFeature=null; }
     $("closeModalBtn").addEventListener("click", closeModal);
-    // Click on backdrop closes
-    $("modal").addEventListener("click", (e)=>{ if(e.target.id==="modal") closeModal(); });
-    // ESC closes
-    window.addEventListener("keydown", (e)=>{ if(e.key==="Escape") closeModal(); });
+    $("modal").addEventListener("click",(e)=>{ if(e.target.id==="modal") closeModal(); });
+    window.addEventListener("keydown",(e)=>{ if(e.key.toLowerCase()==="m"){ // ✅ Shortcut: M
+        openModal("စမ်းသပ် Modal","ဒီ Modal ဟာ Test သာဖြစ်ပြီး Conquer ခလုပ်ကို ဖျောက်ထားပါတယ်။<br>မြေပုံက တစ်ဒေသကို click လုပ်လို့လည်း modal ပေါ်ပါမယ်။", false);
+      } else if (e.key==="Escape"){ closeModal(); }});
+
+    // ✅ Test Modal button
+    $("testModalBtn").addEventListener("click", ()=> {
+      openModal("စမ်းသပ် Modal","ဒီ Modal ဟာ Test သာဖြစ်ပြီး Conquer ခလုပ်ကို ဖျောက်ထားပါတယ်။<br>မြေပုံက တစ်ဒေသကို click လုပ်လို့လည်း modal ပေါ်ပါမယ်။", false);
+    });
 
     function codeOf(feat){
       const p=feat.properties||{}; const name=(p.map_label||p.name||"unknown").trim();
@@ -162,11 +164,11 @@
       const adj=state.adjacency[code]||[];
       const hasOwned=adj.some(c=>state.owners[c]==="player");
       const anyPlayer=Object.values(state.owners).some(v=>v==="player");
-      return hasOwned || !anyPlayer; // first pick: anywhere
+      return hasOwned || !anyPlayer;
     }
     function doConquer(code, feat){
       const cost=conquerCost(feat), menNeed=state.rules.men_per_conquer||6;
-      if(state.coins<cost || state.men<menNeed){ log("ငွေ/စွမ်းအား မလုံလောက် — Conquer မအောင်မြင်"); return false; }
+      if(state.coins<cost || state.men<menNeed){ log("ငွေ/စွမ်းား မလုံလောက် — Conquer မအောင်မြင်"); return false; }
       state.coins-=cost; state.men-=menNeed; state.owners[code]="player";
       log(`သိမ်းပြီး — ${feat.properties?.map_label||feat.properties?.name||"Unknown"} | cost ${cost}, men ${menNeed}`);
       refreshLayer(); updateHUD(); saveGame(); return true;
@@ -174,7 +176,7 @@
 
     function incomeTick(){
       let add=0; state.features.forEach(f=>{ const code=codeOf(f); if(state.owners[code]==="player") add+=areaDefenseIncome(f).income; });
-      if(add>0){ state.coins+=add; state.men+=Math.ceil(add/3); log(`ဝင်ငွေ +${add} coin, စွမ်းအား +${Math.ceil(add/3)}`); }
+      if(add>0){ state.coins+=add; state.men+=Math.ceil(add/3); log(`ဝင်ငွေ +${add} coin, စွမ်းား +${Math.ceil(add/3)}`); }
       updateHUD(); saveGame();
     }
     function aiStep(){
@@ -182,7 +184,7 @@
       const aiOwned=allCodes.filter(c=>state.owners[c]==="ai");
       const neutral=allCodes.filter(c=>(state.owners[c]||"neutral")==="neutral");
       let target=null;
-      if(aiOwned.length===0) target = neutral[Math.floor(Math.random()*neutral.length)];
+      if(aiOwned.length===0) target=neutral[Math.floor(Math.random()*neutral.length)];
       else{
         const candidates=neutral.filter(nc=>aiOwned.some(ac=>(state.adjacency[ac]||[]).includes(nc)));
         if(candidates.length) target=candidates[Math.floor(Math.random()*candidates.length)];
@@ -212,7 +214,6 @@
     function refreshLayer(){ if(state.layer) state.layer.setStyle(styleFeature); }
 
     async function fetchWorld1800(){
-      // Raw GitHub (historical-basemaps)
       const url="https://raw.githubusercontent.com/aourednik/historical-basemaps/master/geojson/world_1800.geojson";
       const res=await fetch(url);
       if(!res.ok) throw new Error("Failed to load world_1800.geojson");
@@ -238,7 +239,6 @@
         const gotSave=loadGame();
         if(!gotSave){
           state.features.forEach(f=>state.owners[codeOf(f)]="neutral");
-          // seed AI 2 regions
           const r1=state.features[Math.floor(Math.random()*state.features.length)];
           const r2=state.features[Math.floor(Math.random()*state.features.length)];
           state.owners[codeOf(r1)]="ai"; state.owners[codeOf(r2)]="ai";
@@ -286,17 +286,4 @@
         log("Loaded North America (circa 1800) historical boundaries. Regions: "+state.features.length);
       }catch(err){
         console.error(err);
-        log("⚠️ Load error: Internet connection/Raw dataset unavailable. Try again or save dataset locally.");
-      }
-    }
-
-    init();
-  </script>
-
-  <!-- Notes:
-    - Historical boundaries GeoJSON (1800): aourednik/historical-basemaps (GPL-3.0).
-      Raw file used: https://raw.githubusercontent.com/aourednik/historical-basemaps/master/geojson/world_1800.geojson
-    - Base tiles: OpenStreetMap via Leaflet.
-  -->
-</body>
-</html>
+        log("⚠️ Load error: Internet connection/Raw dataset unavailable.
