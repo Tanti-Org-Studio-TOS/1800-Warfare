@@ -6,11 +6,11 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>1800 Warfare: North America</title>
 
-  <!-- Leaflet CSS (OSM tiles) -->
+  <!-- Leaflet CSS (MUST use <link>) -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p1nBbG6Y3pQ3Xr3D8rL2gYQmQyQz1r8u+H1QbYQ8S+M="
+    integrity="sha256-E+oWw2w6iigI0hYVd6hw2yQfR8Gv+K1G7nU1F9gC4ZY="
     crossorigin=""
   />
 
@@ -79,22 +79,22 @@
   <!-- Map -->
   <div id="map" aria-label="Map of North America in 1800"></div>
 
-  <!-- Modal -->
+  <!-- Modal (initially hidden by class) -->
   <div id="modal" class="hidden" role="dialog" aria-modal="true">
     <div class="modal-card">
       <h3 id="modal-title">သိမ်းမယ်?</h3>
       <div id="modal-body"></div>
       <div class="modal-actions">
         <button id="conquerBtn">Conquer</button>
-        <button id="closeModalBtn">Cancel</button>
+        <button id="closeModalBtn" type="button">Cancel</button>
       </div>
     </div>
   </div>
 
-  <!-- Leaflet JS -->
+  <!-- Leaflet JS (MUST use <script src>) -->
   <script
     src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-VWmFNfQVd6kZ8Z02ZJpH5cEjm4Cw2j1V2xCEMtNfCj0="
+    integrity="sha256-o9N1j8Mk3f2GQpQ2RkGq1iZ9KqGZbxL8G3GuwZf3g2o="
     crossorigin=""
   ></script>
 
@@ -102,301 +102,201 @@
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
 
   <script>
-    // 1800 Warfare: North America
-    // Real map + historical boundaries (circa 1800) via aourednik/historical-basemaps (GPL-3.0)
-    // Base tiles: OpenStreetMap (Leaflet)
-    // Sources:
-    // - world_1800.geojson: https://github.com/aourednik/historical-basemaps/blob/master/geojson/world_1800.geojson
-    // - Leaflet/OSM tiles: https://www.naturalearthdata.com/downloads/ (context), https://www.openstreetmap.org (tiles via Leaflet)
-    //   Ref: Natural Earth (public domain, general mapping) & OSM contributors. (See docs) 
-
+    // 1800 Warfare: North America (single-file build)
     const state = {
-      timeSec: 0,
-      coins: 60,
-      men: 30,
-      owners: {},      // code => 'player' | 'ai' | 'neutral'
-      rules: {
-        conquer_base_cost: 10,
-        defense_multiplier: 1.4,
-        men_per_conquer: 6,
-        income_tick_seconds: 12,
-        ai_tick_seconds: 15
-      },
-      map: null,
-      layer: null,
-      features: [],    // NA filtered features (countries/regions 1800)
-      adjacency: {},   // code => [neighbor codes]
-      selectedFeature: null
+      timeSec: 0, coins: 60, men: 30,
+      owners: {},
+      rules: { conquer_base_cost: 10, defense_multiplier: 1.4, men_per_conquer: 6, income_tick_seconds: 12, ai_tick_seconds: 15 },
+      map: null, layer: null, features: [], adjacency: {}, selectedFeature: null
     };
 
     const $ = (id) => document.getElementById(id);
-    function log(msg) {
-      const el = $("log");
-      const ts = new Date().toLocaleTimeString();
-      el.innerHTML = `<div>[${ts}] ${msg}</div>` + el.innerHTML;
-    }
-    function updateHUD() {
-      $("coins").textContent = state.coins;
-      $("menpower").textContent = state.men;
-      $("ownedCount").textContent = Object.values(state.owners).filter(o => o === "player").length;
-      $("clock").textContent = new Date(state.timeSec * 1000).toISOString().substr(14,5);
-    }
+    function log(msg){ const el=$("log"); const ts=new Date().toLocaleTimeString(); el.innerHTML=`<div>[${ts}] ${msg}</div>`+el.innerHTML; }
+    function updateHUD(){ $("coins").textContent=state.coins; $("menpower").textContent=state.men;
+      $("ownedCount").textContent=Object.values(state.owners).filter(o=>o==="player").length;
+      $("clock").textContent=new Date(state.timeSec*1000).toISOString().substr(14,5); }
 
     const SAVE_KEY = "warfare1800-na";
-    function saveGame() {
-      localStorage.setItem(SAVE_KEY, JSON.stringify({
-        timeSec: state.timeSec,
-        coins: state.coins,
-        men: state.men,
-        owners: state.owners
-      }));
-    }
-    function loadGame() {
-      const raw = localStorage.getItem(SAVE_KEY);
-      if (!raw) return false;
-      try {
-        const sv = JSON.parse(raw);
-        state.timeSec = sv.timeSec ?? 0;
-        state.coins = sv.coins ?? 60;
-        state.men = sv.men ?? 30;
-        state.owners = sv.owners ?? {};
-        log("Save data loaded.");
-        return true;
-      } catch(e) { console.warn(e); return false; }
+    function saveGame(){ localStorage.setItem(SAVE_KEY, JSON.stringify({timeSec:state.timeSec,coins:state.coins,men:state.men,owners:state.owners})); }
+    function loadGame(){
+      const raw=localStorage.getItem(SAVE_KEY); if(!raw) return false;
+      try{ const sv=JSON.parse(raw); state.timeSec=sv.timeSec??0; state.coins=sv.coins??60; state.men=sv.men??30; state.owners=sv.owners??{}; log("Save data loaded."); return true; }
+      catch(e){ console.warn(e); return false; }
     }
 
-    function ownerColor(owner) {
-      if (owner === "player") return "#3a86ff";
-      if (owner === "ai") return "#ef476f";
-      return "#94a3b8";
-    }
-    function styleFeature(f) {
-      const code = codeOf(f);
-      const owner = state.owners[code] || "neutral";
-      return { color: "#0b1a2a", weight: 1, fillColor: ownerColor(owner), fillOpacity: 0.55 };
-    }
+    function ownerColor(o){ return o==="player"?"#3a86ff":(o==="ai"?"#ef476f":"#94a3b8"); }
+    function styleFeature(f){ const code=codeOf(f); const owner=state.owners[code]||"neutral";
+      return { color:"#0b1a2a", weight:1, fillColor: ownerColor(owner), fillOpacity:0.55 }; }
 
-    function openModal(title, bodyHtml, showConquer=false) {
-      $("modal-title").textContent = title;
-      $("modal-body").innerHTML = bodyHtml;
+    // Modal helpers (make sure it can always close)
+    function openModal(title, bodyHtml, showConquer=false){
+      $("modal-title").textContent=title;
+      $("modal-body").innerHTML=bodyHtml;
       $("modal").classList.remove("hidden");
       $("conquerBtn").classList.toggle("hidden", !showConquer);
     }
-    function closeModal() {
-      $("modal").classList.add("hidden");
-      state.selectedFeature = null;
-    }
+    function closeModal(){ $("modal").classList.add("hidden"); state.selectedFeature=null; }
     $("closeModalBtn").addEventListener("click", closeModal);
+    // Click on backdrop closes
+    $("modal").addEventListener("click", (e)=>{ if(e.target.id==="modal") closeModal(); });
+    // ESC closes
+    window.addEventListener("keydown", (e)=>{ if(e.key==="Escape") closeModal(); });
 
-    function codeOf(feat) {
-      const p = feat.properties || {};
-      const name = (p.map_label || p.name || "unknown").trim();
-      // world_1800 IDs may be absent => make stable code from bbox + name length
-      const bb = turf.bbox(feat);
-      const sig = `${bb[0].toFixed(2)}_${bb[1].toFixed(2)}_${bb[2].toFixed(2)}_${bb[3].toFixed(2)}`;
+    function codeOf(feat){
+      const p=feat.properties||{}; const name=(p.map_label||p.name||"unknown").trim();
+      const bb=turf.bbox(feat); const sig=`${bb[0].toFixed(2)}_${bb[1].toFixed(2)}_${bb[2].toFixed(2)}_${bb[3].toFixed(2)}`;
       return `${name}-${sig}`;
     }
-
-    // ==== Gameplay numbers from area ====
-    function areaDefenseIncome(feat) {
-      try {
-        const km2 = turf.area(feat) / 1_000_000;
-        const defense = Math.max(4, Math.round(Math.log10(km2 + 10) * 6));
-        const income = Math.max(3, Math.round(Math.sqrt(km2) / 220)); // NA scale
+    function areaDefenseIncome(feat){
+      try{ const km2=turf.area(feat)/1_000_000;
+        const defense=Math.max(4, Math.round(Math.log10(km2+10)*6));
+        const income=Math.max(3, Math.round(Math.sqrt(km2)/220));
         return { defense, income };
-      } catch {
-        return { defense: 5, income: 4 };
-      }
+      } catch{ return { defense:5, income:4 }; }
     }
-    function conquerCost(feat) {
-      const base = state.rules.conquer_base_cost || 10;
-      const mult = state.rules.defense_multiplier || 1.4;
-      const { defense } = areaDefenseIncome(feat);
-      return Math.ceil(base + defense * mult);
+    function conquerCost(feat){
+      const base=state.rules.conquer_base_cost||10, mult=state.rules.defense_multiplier||1.4;
+      return Math.ceil(base + areaDefenseIncome(feat).defense * mult);
     }
-
-    function canConquer(code) {
-      const adj = state.adjacency[code] || [];
-      const hasOwnedNeighbors = adj.some(c => state.owners[c] === "player");
-      const anyPlayer = Object.values(state.owners).some(v => v === "player");
-      return hasOwnedNeighbors || !anyPlayer; // first pick can be anywhere
+    function canConquer(code){
+      const adj=state.adjacency[code]||[];
+      const hasOwned=adj.some(c=>state.owners[c]==="player");
+      const anyPlayer=Object.values(state.owners).some(v=>v==="player");
+      return hasOwned || !anyPlayer; // first pick: anywhere
     }
-    function doConquer(code, feat) {
-      const cost = conquerCost(feat);
-      const menNeed = state.rules.men_per_conquer || 6;
-      if (state.coins < cost || state.men < menNeed) {
-        log("ငွေ/စွမ်းအား မလုံလောက် — Conquer မအောင်မြင်");
-        return false;
-      }
-      state.coins -= cost;
-      state.men -= menNeed;
-      state.owners[code] = "player";
-      log(`သိမ်းပြီး — ${feat.properties?.map_label || feat.properties?.name || "Unknown"} | cost ${cost}, men ${menNeed}`);
-      refreshLayer(); updateHUD(); saveGame();
-      return true;
+    function doConquer(code, feat){
+      const cost=conquerCost(feat), menNeed=state.rules.men_per_conquer||6;
+      if(state.coins<cost || state.men<menNeed){ log("ငွေ/စွမ်းအား မလုံလောက် — Conquer မအောင်မြင်"); return false; }
+      state.coins-=cost; state.men-=menNeed; state.owners[code]="player";
+      log(`သိမ်းပြီး — ${feat.properties?.map_label||feat.properties?.name||"Unknown"} | cost ${cost}, men ${menNeed}`);
+      refreshLayer(); updateHUD(); saveGame(); return true;
     }
 
-    // ==== Income & AI ====
-    function incomeTick() {
-      let add = 0;
-      state.features.forEach(f => {
-        const code = codeOf(f);
-        if (state.owners[code] === "player") add += areaDefenseIncome(f).income;
-      });
-      if (add > 0) {
-        state.coins += add;
-        state.men += Math.ceil(add / 3);
-        log(`ဝင်ငွေ +${add} coin, စွမ်းား +${Math.ceil(add/3)}`);
-      }
+    function incomeTick(){
+      let add=0; state.features.forEach(f=>{ const code=codeOf(f); if(state.owners[code]==="player") add+=areaDefenseIncome(f).income; });
+      if(add>0){ state.coins+=add; state.men+=Math.ceil(add/3); log(`ဝင်ငွေ +${add} coin, စွမ်းအား +${Math.ceil(add/3)}`); }
       updateHUD(); saveGame();
     }
-    function aiStep() {
-      const aiOwned = state.features.map(f => codeOf(f)).filter(c => state.owners[c] === "ai");
-      const neutral = state.features.map(f => codeOf(f)).filter(c => (state.owners[c] || "neutral") === "neutral");
-      let target = null;
-      if (aiOwned.length === 0) {
-        target = neutral[Math.floor(Math.random() * neutral.length)];
-      } else {
-        const candidates = neutral.filter(nc => aiOwned.some(ac => (state.adjacency[ac] || []).includes(nc)));
-        target = (candidates.length ? candidates[Math.floor(Math.random()*candidates.length)] : null);
+    function aiStep(){
+      const allCodes=state.features.map(f=>codeOf(f));
+      const aiOwned=allCodes.filter(c=>state.owners[c]==="ai");
+      const neutral=allCodes.filter(c=>(state.owners[c]||"neutral")==="neutral");
+      let target=null;
+      if(aiOwned.length===0) target = neutral[Math.floor(Math.random()*neutral.length)];
+      else{
+        const candidates=neutral.filter(nc=>aiOwned.some(ac=>(state.adjacency[ac]||[]).includes(nc)));
+        if(candidates.length) target=candidates[Math.floor(Math.random()*candidates.length)];
       }
-      if (!target) return;
-      state.owners[target] = "ai";
-      const feat = state.features.find(f => codeOf(f) === target);
-      log(`AI သိမ်းယူ — ${feat?.properties?.map_label || feat?.properties?.name || target}`);
+      if(!target) return;
+      state.owners[target]="ai";
+      const feat=state.features.find(f=>codeOf(f)===target);
+      log(`AI သိမ်းယူ — ${feat?.properties?.map_label||feat?.properties?.name||target}`);
       refreshLayer(); updateHUD(); saveGame();
     }
 
-    // ==== Build adjacency (touching polygons) ====
-    function buildAdjacency(features) {
-      const adj = {};
-      const boxes = features.map(f => ({ code: codeOf(f), bbox: turf.bbox(f) }));
-      for (let i=0;i<features.length;i++) {
-        const fi = features[i], ci = codeOf(fi); adj[ci] = adj[ci] || [];
-        for (let j=i+1;j<features.length;j++) {
-          const fj = features[j], cj = codeOf(fj);
-          const bbi = boxes[i].bbox, bbj = boxes[j].bbox;
-          const overlap = !(bbj[0] > bbi[2] || bbj[2] < bbi[0] || bbj[1] > bbi[3] || bbj[3] < bbi[1]);
-          if (!overlap) continue;
-          let touches = false;
-          try { touches = turf.booleanIntersects(fi, fj); } catch { touches = false; }
-          if (touches) { adj[ci].push(cj); adj[cj] = adj[cj] || []; adj[cj].push(ci); }
+    function buildAdjacency(features){
+      const adj={}; const boxes=features.map(f=>({ code:codeOf(f), bbox:turf.bbox(f) }));
+      for(let i=0;i<features.length;i++){
+        const fi=features[i], ci=codeOf(fi); adj[ci]=adj[ci]||[];
+        for(let j=i+1;j<features.length;j++){
+          const fj=features[j], cj=codeOf(fj);
+          const bbi=boxes[i].bbox, bbj=boxes[j].bbox;
+          const overlap=!(bbj[0]>bbi[2]||bbj[2]<bbi[0]||bbj[1]>bbi[3]||bbj[3]<bbi[1]);
+          if(!overlap) continue;
+          let touch=false; try{ touch=turf.booleanIntersects(fi,fj); }catch{}
+          if(touch){ adj[ci].push(cj); adj[cj]=adj[cj]||[]; adj[cj].push(ci); }
         }
       }
       return adj;
     }
     function refreshLayer(){ if(state.layer) state.layer.setStyle(styleFeature); }
 
-    // ==== Fetch & Filter NA (1800) ====
-    async function fetchWorld1800() {
-      const remoteUrl = "https://raw.githubusercontent.com/aourednik/historical-basemaps/master/geojson/world_1800.geojson";
-      const res = await fetch(remoteUrl);
-      if (!res.ok) throw new Error("Failed to load world_1800.geojson");
+    async function fetchWorld1800(){
+      // Raw GitHub (historical-basemaps)
+      const url="https://raw.githubusercontent.com/aourednik/historical-basemaps/master/geojson/world_1800.geojson";
+      const res=await fetch(url);
+      if(!res.ok) throw new Error("Failed to load world_1800.geojson");
       return await res.json();
     }
-    function isNorthAmericaFeature(feat) {
-      // North America + Caribbean + Central America (broad): lon -170..-30, lat 5..83
-      const [minX, minY, maxX, maxY] = turf.bbox(feat);
-      const width = maxX - minX, height = maxY - minY;
-      const xIn = Math.max(0, Math.min(maxX, -30) - Math.max(minX, -170));
-      const yIn = Math.max(0, Math.min(maxY, 83) - Math.max(minY, 5));
-      const pct = (xIn/width) * (yIn/height);
-      return Number.isFinite(pct) && pct > 0.30;
+    function isNorthAmericaFeature(feat){
+      const [minX,minY,maxX,maxY]=turf.bbox(feat);
+      const width=maxX-minX, height=maxY-minY;
+      const xIn=Math.max(0, Math.min(maxX,-30)-Math.max(minX,-170));
+      const yIn=Math.max(0, Math.min(maxY,83)-Math.max(minY,5));
+      const pct=(xIn/width)*(yIn/height);
+      return Number.isFinite(pct) && pct>0.30;
     }
 
-    async function init() {
-      // Map
-      state.map = L.map("map", { minZoom: 3, maxZoom: 10, zoomControl:true }).setView([39,-101], 4);
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "© OpenStreetMap contributors"
-      }).addTo(state.map);
+    async function init(){
+      try{
+        state.map=L.map("map",{minZoom:3,maxZoom:10,zoomControl:true}).setView([39,-101],4);
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{ attribution:"© OpenStreetMap contributors" }).addTo(state.map);
 
-      // Data
-      const world = await fetchWorld1800();            // historical (1800) dataset
-      const featsNA = world.features.filter(isNorthAmericaFeature);
+        const world=await fetchWorld1800();
+        state.features=world.features.filter(isNorthAmericaFeature);
 
-      // Keep many countries (USA/New Spain/British North America/Russian America/Greenland/Caribbean colonies…)
-      state.features = featsNA;
-
-      // Owners init
-      const gotSave = loadGame();
-      if (!gotSave) {
-        state.features.forEach(f => { state.owners[codeOf(f)] = "neutral"; });
-
-        // Seed AI 2 factions by random areas (to ensure "countries many" start state)
-        const rndA = state.features[Math.floor(Math.random()*state.features.length)];
-        const rndB = state.features[Math.floor(Math.random()*state.features.length)];
-        state.owners[codeOf(rndA)] = "ai";
-        state.owners[codeOf(rndB)] = "ai";
-        saveGame();
-      }
-
-      // Adjacency
-      state.adjacency = buildAdjacency(state.features);
-
-      // Layer
-      state.layer = L.geoJSON(state.features, {
-        style: styleFeature,
-        onEachFeature: (feature, layer) => {
-          const nm = feature.properties?.map_label || feature.properties?.name || "Unknown";
-          const { defense, income } = areaDefenseIncome(feature);
-          layer.bindTooltip(`${nm}`, { direction:"top" });
-          layer.on("click", () => {
-            const code = codeOf(feature);
-            const owner = state.owners[code] || "neutral";
-            const cost = conquerCost(feature);
-            if (owner === "player") {
-              openModal(nm, `သင့်ပိုင် (Defense: <strong>${defense}</strong>, Income: <strong>${income}</strong>)`, false);
-            } else if (!canConquer(code)) {
-              openModal("Conquer မနိုင်", "Player ပိုင်နယ်နိမိတ်နီးပါး မရှိသေးပါ။ (first pick သည် နေရာမရွေးနိုင်)", false);
-            } else {
-              state.selectedFeature = feature;
-              openModal(
-                `သိမ်းမည်: ${nm}`,
-                `ကုန်ကျစရိတ် <strong>${cost} coin</strong>, စွမ်းအားအသုံး <strong>${state.rules.men_per_conquer}</strong><br/>
-                 Defense: <strong>${defense}</strong>, Income: <strong>${income}</strong>`,
-                true
-              );
-            }
-          });
+        const gotSave=loadGame();
+        if(!gotSave){
+          state.features.forEach(f=>state.owners[codeOf(f)]="neutral");
+          // seed AI 2 regions
+          const r1=state.features[Math.floor(Math.random()*state.features.length)];
+          const r2=state.features[Math.floor(Math.random()*state.features.length)];
+          state.owners[codeOf(r1)]="ai"; state.owners[codeOf(r2)]="ai";
+          saveGame();
         }
-      }).addTo(state.map);
 
-      // UI
-      updateHUD();
+        state.adjacency=buildAdjacency(state.features);
 
-      // Timers
-      setInterval(() => {
-        state.timeSec += (state.rules.income_tick_seconds || 12);
-        incomeTick(); updateHUD();
-      }, (state.rules.income_tick_seconds || 12) * 1000);
+        state.layer=L.geoJSON(state.features,{
+          style:styleFeature,
+          onEachFeature:(feature,layer)=>{
+            const nm=feature.properties?.map_label||feature.properties?.name||"Unknown";
+            const stats=areaDefenseIncome(feature);
+            layer.bindTooltip(nm,{direction:"top"});
+            layer.on("click",()=>{
+              const code=codeOf(feature);
+              const owner=state.owners[code]||"neutral";
+              const cost=conquerCost(feature);
+              if(owner==="player"){
+                openModal(nm,`သင့်ပိုင် (Defense: <strong>${stats.defense}</strong>, Income: <strong>${stats.income}</strong>)`,false);
+              }else if(!canConquer(code)){
+                openModal("Conquer မနိုင်","Player ပိုင်နယ်နိမိတ်နီးပါး မရှိသေးပါ။ (first pick သည် နေရာမရွေးနိုင်)",false);
+              }else{
+                state.selectedFeature=feature;
+                openModal(`သိမ်းမည်: ${nm}`,
+                  `ကုန်ကျစရိတ် <strong>${cost} coin</strong>, စွမ်းအားအသုံး <strong>${state.rules.men_per_conquer}</strong><br/>
+                   Defense: <strong>${stats.defense}</strong>, Income: <strong>${stats.income}</strong>`,
+                  true);
+              }
+            });
+          }
+        }).addTo(state.map);
 
-      setInterval(() => { aiStep(); }, (state.rules.ai_tick_seconds || 15) * 1000);
+        updateHUD();
 
-      // Buttons
-      $("endTurnBtn").addEventListener("click", () => {
-        state.timeSec += 30; incomeTick(); updateHUD();
-      });
-      $("resetBtn").addEventListener("click", () => {
-        localStorage.removeItem(SAVE_KEY); location.reload();
-      });
+        setInterval(()=>{ state.timeSec+=(state.rules.income_tick_seconds||12); incomeTick(); updateHUD(); },
+          (state.rules.income_tick_seconds||12)*1000);
+        setInterval(()=>{ aiStep(); }, (state.rules.ai_tick_seconds||15)*1000);
 
-      $("conquerBtn").addEventListener("click", () => {
-        if (!state.selectedFeature) return;
-        const code = codeOf(state.selectedFeature);
-        if (doConquer(code, state.selectedFeature)) closeModal();
-      });
+        $("endTurnBtn").addEventListener("click",()=>{ state.timeSec+=30; incomeTick(); updateHUD(); });
+        $("resetBtn").addEventListener("click",()=>{ localStorage.removeItem(SAVE_KEY); location.reload(); });
+        $("conquerBtn").addEventListener("click",()=>{ if(!state.selectedFeature) return; const code=codeOf(state.selectedFeature);
+          if(doConquer(code,state.selectedFeature)) closeModal(); });
 
-      log("Loaded North America (circa 1800) historical boundaries. Countries/regions: " + state.features.length);
+        log("Loaded North America (circa 1800) historical boundaries. Regions: "+state.features.length);
+      }catch(err){
+        console.error(err);
+        log("⚠️ Load error: Internet connection/Raw dataset unavailable. Try again or save dataset locally.");
+      }
     }
 
     init();
   </script>
 
-  <!-- Credits (data sources): 
-    - Historical boundaries (1800): aourednik/historical-basemaps (GPL-3.0) https://github.com/aourednik/historical-basemaps/blob/master/geojson/world_1800.geojson
-    - Base tiles: OpenStreetMap via Leaflet (© OSM contributors)
-    - General mapping context: Natural Earth (public domain) https://www.naturalearthdata.com/downloads/
+  <!-- Notes:
+    - Historical boundaries GeoJSON (1800): aourednik/historical-basemaps (GPL-3.0).
+      Raw file used: https://raw.githubusercontent.com/aourednik/historical-basemaps/master/geojson/world_1800.geojson
+    - Base tiles: OpenStreetMap via Leaflet.
   -->
 </body>
 </html>
