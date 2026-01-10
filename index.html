@@ -6,11 +6,11 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>မြောက်အမေရိက ၁၈၀၀ — RTS + TBS Strategy</title>
 
-  <!-- Leaflet CSS (CDN) -->
+  <!-- ✅ Leaflet CSS (CDN) -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4Qqj8P+2VfW7YQJmQZQZlYVQpC5KQqZ2v9Z4bY+4Yk="
+    integrity=""
     crossorigin=""
   />
 
@@ -44,18 +44,11 @@
       font-family: system-ui, -apple-system, Segoe UI, "Myanmar Khyay", "Myanmar Sangam MN", "Noto Sans Myanmar", Roboto, Arial, sans-serif;
     }
     .topbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 12px;
-      border-bottom: 1px solid var(--border);
-      background: var(--card);
-      position: sticky;
-      top: 0;
-      z-index: 1000;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 12px; border-bottom: 1px solid var(--border); background: var(--card);
+      position: sticky; top: 0; z-index: 1000;
     }
     .brand { display: flex; align-items: center; gap: 8px; }
-    .brand .logo { font-weight: 700; }
     .controls > * { margin-left: 8px; }
     .switch { display: inline-flex; align-items: center; gap: 6px; }
     .file-label {
@@ -71,6 +64,7 @@
     #sidebar { overflow: auto; border-right: 1px solid var(--border); background: var(--bg); }
     .panel { padding: 12px; border-bottom: 1px solid var(--border); }
     .panel h3 { margin: 0 0 8px; }
+    /* ✅ Map must have height */
     #map { height: 100%; width: 100%; }
     button, select, input {
       color: var(--text); background: var(--card); border: 1px solid var(--border);
@@ -83,23 +77,13 @@
     #legend { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
     .legend-item { display: flex; align-items: center; gap: 8px; }
     .swatch { width: 16px; height: 16px; border-radius: 3px; border: 1px solid var(--border); }
-
-    .city-badge {
-      background: var(--accent-2); color: white; padding: 2px 6px; border-radius: 8px;
-      border: 1px solid rgba(0,0,0,0.2); font-size: 12px;
-    }
-    .unit-badge {
-      background: var(--accent); color: white; padding: 2px 6px; border-radius: 8px;
-      border: 1px solid rgba(0,0,0,0.2); font-size: 12px;
-    }
-    .progress {
-      width: 100%; height: 8px; background: var(--card); border: 1px solid var(--border);
-      border-radius: 4px; overflow: hidden; margin-top: 4px;
-    }
-    .progress > span {
-      display: block; height: 100%; background: var(--accent);
-      width: 0%;
-    }
+    .city-badge { background: var(--accent-2); color: white; padding: 2px 6px; border-radius: 8px;
+      border: 1px solid rgba(0,0,0,0.2); font-size: 12px; }
+    .unit-badge { background: var(--accent); color: white; padding: 2px 6px; border-radius: 8px;
+      border: 1px solid rgba(0,0,0,0.2); font-size: 12px; }
+    .progress { width: 100%; height: 8px; background: var(--card); border: 1px solid var(--border);
+      border-radius: 4px; overflow: hidden; margin-top: 4px; }
+    .progress > span { display: block; height: 100%; background: var(--accent); width: 0%; }
     .flex { display: flex; gap: 8px; align-items: center; }
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     footer { padding: 6px 12px; border-top: 1px solid var(--border); background: var(--card); }
@@ -230,10 +214,10 @@
     </small>
   </footer>
 
-  <!-- Leaflet JS (CDN) -->
+  <!-- ✅ Leaflet JS (CDN) -->
   <script
     src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-QV1rYvZfVDsoafg3ZCkAyc6nloQxG8JHvfHqRaoCqYQ="
+    integrity=""
     crossorigin=""
   ></script>
 
@@ -367,7 +351,7 @@
       date: { year: 1800, month: 1 },
       rtsPaused: false,
       speed: 1.0,
-      resources: { food: 10, gold: 10, wood: 10, iron: 10 }, // start with some
+      resources: { food: 10, gold: 10, wood: 10, iron: 10 },
       mode: "select", // select | placeCity | build | train | assignGeneral
     };
     let rtsInterval = null;
@@ -551,9 +535,7 @@
     }
 
     function processCityQueues(dt) {
-      // dt ~ seconds scaled by speed
       cities.forEach(city => {
-        // General production bonus
         const prodBonus = city.generalId ? (generals.find(g => g.id === city.generalId)?.bonus?.prod || 0) : 0;
 
         // Apply building yields
@@ -581,7 +563,6 @@
           const job = city.prodQueue[0];
           job.timeLeft -= dt * gameState.speed * (1 + prodBonus);
           if (job.timeLeft <= 0) {
-            // produce unit at city position
             addUnit(city.latlng, city.factionId, "infantry");
             city.prodQueue.shift();
             renderUnitList();
@@ -654,7 +635,6 @@
     function createGeneral(nameInput) {
       const id = ++generalCounter;
       const name = (nameInput || "").trim() || (currentLang === "my" ? `ဗိုလ်-${id}` : `General-${id}`);
-      // simple random-ish bonus set
       const bonus = {
         atk: 0.10 + Math.random()*0.10,  // 10-20%
         def: 0.10 + Math.random()*0.10,
@@ -666,7 +646,6 @@
     }
 
     function assignGeneral(target) {
-      // target: {type:'unit'|'city', id}
       const available = generals.find(g => !g.assignedTo);
       if (!available) {
         return alert(currentLang === "my" ? "ဗိုလ်ချုပ်မရှိ/အားလပ်မရှိ" : "No free generals");
@@ -676,10 +655,9 @@
         const unit = units.find(u => u.id === target.id);
         if (unit) {
           unit.generalId = available.id;
-          // apply buffs
           unit.stats.atk *= (1 + available.bonus.atk);
           unit.stats.def *= (1 + available.bonus.def);
-          unit.stats.spd *= (1 + 0.05); // small speed buff
+          unit.stats.spd *= (1 + 0.05);
         }
       } else if (target.type === "city") {
         const city = cities.find(c => c.id === target.id);
@@ -696,14 +674,12 @@
       const tickMs = 1000; // base 1s
       rtsInterval = setInterval(() => {
         if (gameState.rtsPaused) return;
-        // Base yields (global)
         const s = gameState.speed;
         gameState.resources.food += 0.2 * s;
         gameState.resources.gold += 0.1 * s;
         gameState.resources.wood += 0.2 * s;
         gameState.resources.iron += 0.05 * s;
 
-        // City/Building yields & queues
         processCityQueues(tickMs / 1000); // dt seconds
 
         updateResourceUI();
@@ -736,7 +712,6 @@
     }
 
     function endTurn() {
-      // upkeep (simple)
       gameState.resources.food = Math.max(0, gameState.resources.food - 0.8 * units.length);
       gameState.resources.gold = Math.max(0, gameState.resources.gold - 0.2 * units.length);
       gameState.turn++;
@@ -833,15 +808,12 @@
         const name = prompt(currentLang === "my" ? "မြို့အမည်" : "City name");
         placeCity(e.latlng, name, "usa");
       } else if (mode === "build") {
-        // Build mode requires clicking a city marker or just use selectedCity
         const city = cities.find(c => c.id === selectedCityId);
         if (!city) return alert(currentLang === "my" ? "အရင် မြို့ရွေးပါ" : "Select a city first");
-        // The specific building type is set by clicking a build button (below)
         alert(currentLang === "my" ? "Build အမျိုးအစားကို sidebar မှ ရွေးပါ" : "Choose a build type in sidebar.");
       } else if (mode === "train") {
         queueTrainInfantry();
       } else if (mode === "assignGeneral") {
-        // Assign to unit if one is selected, else city
         if (selectedUnitId) assignGeneral({type: "unit", id: selectedUnitId});
         else if (selectedCityId) assignGeneral({type: "city", id: selectedCityId});
         else alert(currentLang === "my" ? "Unit/City ရွေးပါ" : "Select a Unit or City");
@@ -860,10 +832,8 @@
       loadPlaceholderTerritories();
       startRTSLoop();
 
-      // default unit
       addUnit([39.0, -95.0], "usa", "infantry");
 
-      // UI bindings
       document.getElementById("lang").addEventListener("change", e => {
         currentLang = e.target.value;
         localStorage.setItem("lang", currentLang);
@@ -895,7 +865,6 @@
 
       document.getElementById("trainInfantryBtn").addEventListener("click", queueTrainInfantry);
 
-      // Build buttons set selected building type & queue immediately
       document.querySelectorAll(".buildBtn").forEach(btn => {
         btn.addEventListener("click", () => {
           const type = btn.dataset.type;
@@ -907,9 +876,7 @@
         });
       });
 
-      document.getElementById("geojsonFile").addEventListener("change", e => {
-        const file = e.target.files?.[0];
-        if (file) handleGeoJSONFileInput(file);
+      document.getElementById);
       });
 
       document.getElementById("basemap").addEventListener("change", e => {
