@@ -7,7 +7,12 @@
   <title>မြောက်အမေရိက ၁၈၀၀ — RTS + TBS Strategy</title>
 
   <!-- Leaflet CSS (CDN) -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4Qqj8P+2VfW7YQJmQZQZlYVQpC5KQqZ2v9Z4bY+4Yk="
+    crossorigin=""
+  />
 
   <style>
     :root {
@@ -17,6 +22,8 @@
       --border: #dadada;
       --accent: #0057ff;
       --accent-2: #0f9d58;
+      --danger: #e63946;
+      --ok: #2a9d8f;
     }
     body[data-theme="dark"] {
       --bg: #0f1115;
@@ -25,6 +32,8 @@
       --border: #2a2e37;
       --accent: #5aa1ff;
       --accent-2: #34a853;
+      --danger: #ef476f;
+      --ok: #06d6a0;
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; }
@@ -56,25 +65,45 @@
     }
     .file-label input { display: none; }
     main {
-      display: grid; grid-template-columns: 320px 1fr;
+      display: grid; grid-template-columns: 360px 1fr;
       height: calc(100vh - 56px);
     }
     #sidebar { overflow: auto; border-right: 1px solid var(--border); background: var(--bg); }
     .panel { padding: 12px; border-bottom: 1px solid var(--border); }
+    .panel h3 { margin: 0 0 8px; }
     #map { height: 100%; width: 100%; }
     button, select, input {
       color: var(--text); background: var(--card); border: 1px solid var(--border);
       border-radius: 6px; padding: 6px 8px;
     }
     button:hover { border-color: var(--accent); }
+    .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn-danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+    .btn-ok { background: var(--ok); color: #fff; border-color: var(--ok); }
     #legend { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
     .legend-item { display: flex; align-items: center; gap: 8px; }
     .swatch { width: 16px; height: 16px; border-radius: 3px; border: 1px solid var(--border); }
+
+    .city-badge {
+      background: var(--accent-2); color: white; padding: 2px 6px; border-radius: 8px;
+      border: 1px solid rgba(0,0,0,0.2); font-size: 12px;
+    }
     .unit-badge {
       background: var(--accent); color: white; padding: 2px 6px; border-radius: 8px;
       border: 1px solid rgba(0,0,0,0.2); font-size: 12px;
     }
+    .progress {
+      width: 100%; height: 8px; background: var(--card); border: 1px solid var(--border);
+      border-radius: 4px; overflow: hidden; margin-top: 4px;
+    }
+    .progress > span {
+      display: block; height: 100%; background: var(--accent);
+      width: 0%;
+    }
+    .flex { display: flex; gap: 8px; align-items: center; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     footer { padding: 6px 12px; border-top: 1px solid var(--border); background: var(--card); }
+    .hint { font-size: 12px; opacity: 0.7; }
   </style>
 </head>
 <body data-theme="light">
@@ -96,9 +125,9 @@
         <span id="pauseRTSLabel">RTS ပိတ်ထား</span>
       </label>
 
-      <label>
+      <label class="switch">
         <span id="speedLabel">အမြန်နှုန်း</span>
-        <input type="range" id="speed" min="0.25" max="3" step="0.25" value="1">
+        <input type="range" id="speed" min="0.5" max="3" step="0.25" value="1">
       </label>
 
       <button id="startTurnBtn">🏁 <span id="startTurnText">Turn စ</span></button>
@@ -112,6 +141,14 @@
       <select id="basemap">
         <option value="osm">OpenStreetMap</option>
         <option value="opentopo">OpenTopoMap</option>
+      </select>
+
+      <select id="mode">
+        <option value="select">🖱️ Select/Move</option>
+        <option value="placeCity">🏙️ Place City</option>
+        <option value="build">🏗️ Build Structure</option>
+        <option value="train">🎖️ Train Soldier</option>
+        <option value="assignGeneral">⭐ Assign General</option>
       </select>
     </div>
   </header>
@@ -140,9 +177,42 @@
       </section>
 
       <section class="panel">
+        <h3 id="citiesTitle">မြို့များ</h3>
+        <div class="hint" id="citiesHint">Map ပေါ်ကို Place City mode နဲ့ click လုပ်ပါ။</div>
+        <ul id="cityList"></ul>
+      </section>
+
+      <section class="panel">
+        <h3 id="buildTitle">တည်ဆောက်နိုင်သည်</h3>
+        <div class="grid-2">
+          <button class="buildBtn" data-type="farm">🌾 Farm</button>
+          <button class="buildBtn" data-type="lumber">🪵 Lumber Mill</button>
+          <button class="buildBtn" data-type="mine">⛏️ Mine</button>
+          <button class="buildBtn" data-type="barracks">🏰 Barracks</button>
+          <button class="buildBtn" data-type="fort">🛡️ Fort</button>
+        </div>
+        <div class="hint" id="buildHint">City တစ်ခုရွေးပြီး Build mode နဲ့ တည်ဆောက်ကြ세요။</div>
+        <div id="buildQueue"></div>
+      </section>
+
+      <section class="panel">
         <h3 id="unitsTitle">ယူနစ်များ</h3>
-        <button id="addUnitBtn">➕ <span id="addUnitText">ယူနစ်ထည့်</span></button>
+        <div class="flex">
+          <button id="addUnitBtn">➕ <span id="addUnitText">ယူနစ်ထည့်</span></button>
+          <button id="trainInfantryBtn" class="btn-primary">🎖️ <span id="trainInfantryText">Infantry ချီတက်</span></button>
+        </div>
+        <div class="hint" id="trainHint">Barracks ပါသော မြို့ကို ရွေးပြီး Train mode.</div>
         <ul id="unitList"></ul>
+      </section>
+
+      <section class="panel">
+        <h3 id="generalsTitle">ဗိုလ်ချုပ်များ</h3>
+        <div class="flex">
+          <input type="text" id="newGeneralName" placeholder="General Name" />
+          <button id="createGeneralBtn" class="btn-ok">⭐ <span id="createGeneralText">ဗိုလ်ချုပ်ဖန်တီး</span></button>
+        </div>
+        <div class="hint" id="assignHint">Assign General mode သို့ပြောင်းပြီး Unit/City ကိုနှိပ်ပါ။</div>
+        <ul id="generalList"></ul>
       </section>
 
       <section class="panel">
@@ -161,7 +231,11 @@
   </footer>
 
   <!-- Leaflet JS (CDN) -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-QV1rYvZfVDsoafg3ZCkAyc6nloQxG8JHvfHqRaoCqYQ="
+    crossorigin=""
+  ></script>
 
   <!-- Placeholder GeoJSON embedded inline -->
   <script id="placeholderGeoJSON" type="application/json">
@@ -226,6 +300,15 @@
           "Demo build. Territory GeoJSON here is placeholder (not historically accurate). Upload your own 1800-boundaries for authentic gameplay.",
         rtsRunning: "ရုပ်ရှင်အလုပ်လုပ်နေ",
         rtsPaused: "ရုပ်ရှင်ပိတ်ထား",
+        citiesTitle: "မြို့များ",
+        citiesHint: "Map ပေါ်ကို Place City mode နဲ့ click လုပ်ပါ။",
+        buildTitle: "တည်ဆောက်နိုင်သည်",
+        buildHint: "City တစ်ခုရွေးပြီး Build mode နဲ့ တည်ဆောက်ကြ세요။",
+        trainInfantryText: "Infantry ချီတက်",
+        trainHint: "Barracks ပါသော မြို့ကို ရွေးပြီး Train mode.",
+        generalsTitle: "ဗိုလ်ချုပ်များ",
+        createGeneralText: "ဗိုလ်ချုပ်ဖန်တီး",
+        assignHint: "Assign General mode သို့ပြောင်းပြီး Unit/City ကိုနှိပ်ပါ။",
       },
       en: {
         title: "North America 1800 — Strategy (RTS + TBS)",
@@ -247,6 +330,15 @@
           "Demo build. Territory GeoJSON here is placeholder (not historically accurate). Upload your own 1800-boundaries for authentic gameplay.",
         rtsRunning: "Running",
         rtsPaused: "Paused",
+        citiesTitle: "Cities",
+        citiesHint: "Use Place City mode then click on the map.",
+        buildTitle: "Buildables",
+        buildHint: "Select a city and use Build mode.",
+        trainInfantryText: "Train Infantry",
+        trainHint: "Select a city with Barracks, then Train mode.",
+        generalsTitle: "Generals",
+        createGeneralText: "Create General",
+        assignHint: "Switch to Assign General mode then click a Unit/City.",
       },
     };
 
@@ -261,24 +353,41 @@
       { id: "neutral", name_my: "အလယ်အလတ်", name_en: "Neutral", color: "#adb5bd" },
     ];
 
+    // ===== Game State =====
     let currentLang = "my";
     let map, baseLayers = {}, territoryLayer;
-    let units = [];
+    let units = [];       // {id, type, factionId, marker, latlng, generalId, stats}
+    let cities = [];      // {id, name, factionId, marker, latlng, buildings:[], buildQueue:[], prodQueue:[], generalId}
+    let generals = [];    // {id, name, factionId, bonus, assignedTo: {type:'unit'|'city', id}}
     let selectedUnitId = null;
+    let selectedCityId = null;
 
     const gameState = {
       turn: 1,
-      date: { year: 1800, month: 1 }, // month 1-12
+      date: { year: 1800, month: 1 },
       rtsPaused: false,
       speed: 1.0,
-      resources: { food: 0, gold: 0, wood: 0, iron: 0 },
+      resources: { food: 10, gold: 10, wood: 10, iron: 10 }, // start with some
+      mode: "select", // select | placeCity | build | train | assignGeneral
     };
     let rtsInterval = null;
+
+    // ===== Building & Training Definitions =====
+    const BUILDINGS = {
+      farm:   { name: "Farm",   cost: {wood: 10, gold: 0, iron: 0, food: 0}, time: 8, yields: {food: 0.6} },
+      lumber: { name: "Lumber", cost: {wood: 0,  gold: 0, iron: 0, food: 0}, time: 8, yields: {wood: 0.4} },
+      mine:   { name: "Mine",   cost: {wood: 8,  gold: 0, iron: 0, food: 0}, time: 12, yields: {iron: 0.3, gold: 0.15} },
+      barracks:{name:"Barracks",cost: {wood: 12, gold: 5, iron: 4, food: 0}, time: 14, yields: {} },
+      fort:   { name: "Fort",   cost: {wood: 8,  gold: 3, iron: 6, food: 0}, time: 16, yields: {} },
+    };
+    const UNIT_TYPES = {
+      infantry: { name: "Infantry", cost: {food: 4, wood: 2, iron: 2, gold: 1}, time: 10, stats: {atk: 5, def: 4, spd: 1.0} }
+    };
 
     // ===== Map init (Leaflet) =====
     function initMap() {
       map = L.map("map", {
-        center: [40.0, -100.0], // North America center-ish
+        center: [40.0, -100.0],
         zoom: 4,
         minZoom: 3,
         maxZoom: 12,
@@ -308,11 +417,11 @@
           const factionId = feature.properties?.factionId || "neutral";
           const isPlaceholder = feature.properties?.isPlaceholder ? " (placeholder)" : "";
           layer.bindPopup(`<strong>${name}</strong><br/>Faction: ${factionId}${isPlaceholder}`);
-          layer.on("click", () => {
-            console.log("Territory clicked:", feature.properties);
-          });
         },
       }).addTo(map);
+
+      // Map click for various modes
+      map.on("click", onMapClick);
     }
 
     function getFactionColor(id) {
@@ -320,6 +429,7 @@
       return f ? f.color : "#adb5bd";
     }
 
+    // ===== Legend & Lists =====
     function renderLegend() {
       const el = document.getElementById("legend");
       el.innerHTML = "";
@@ -344,19 +454,260 @@
       });
     }
 
-    // ===== Game Loop (RTS + TBS) =====
+    function renderCityList() {
+      const list = document.getElementById("cityList");
+      list.innerHTML = "";
+      cities.forEach(c => {
+        const li = document.createElement("li");
+        li.innerHTML = `<strong>${c.name}</strong> — ${c.factionId} · buildings: ${c.buildings.length}`;
+        li.style.cursor = "pointer";
+        li.onclick = () => selectCity(c.id);
+        list.appendChild(li);
+      });
+      renderBuildQueue();
+    }
+
+    function renderUnitList() {
+      const list = document.getElementById("unitList");
+      list.innerHTML = "";
+      units.forEach(u => {
+        const ll = u.marker.getLatLng();
+        const g = u.generalId ? `⭐G${u.generalId}` : "";
+        const li = document.createElement("li");
+        li.textContent = `U${u.id} (${u.type}) — ${u.factionId} ${g} @ ${ll.lat.toFixed(2)}, ${ll.lng.toFixed(2)}`;
+        list.appendChild(li);
+      });
+    }
+
+    function renderGeneralList() {
+      const list = document.getElementById("generalList");
+      list.innerHTML = "";
+      generals.forEach(g => {
+        const li = document.createElement("li");
+        const assign = g.assignedTo ? ` → ${g.assignedTo.type} ${g.assignedTo.id}` : " (unassigned)";
+        li.textContent = `G${g.id} ${g.name} [atk+${Math.round(g.bonus.atk*100)}% def+${Math.round(g.bonus.def*100)}% prod+${Math.round(g.bonus.prod*100)}%]${assign}`;
+        list.appendChild(li);
+      });
+    }
+
+    // ===== Cities =====
+    let cityCounter = 0;
+    function placeCity(latlng, name = null, factionId = "usa") {
+      const id = ++cityCounter;
+      if (!name) {
+        name = currentLang === "my" ? `မြို့-${id}` : `City-${id}`;
+      }
+      const iconHtml = `<div class="city-badge">🏙️ ${name}</div>`;
+      const icon = L.divIcon({ html: iconHtml, className: "city-icon", iconSize: [28,28] });
+      const marker = L.marker(latlng, { icon, draggable: false }).addTo(map);
+      marker.on("click", () => selectCity(id));
+
+      const city = { id, name, factionId, marker, latlng, buildings: [], buildQueue: [], prodQueue: [], generalId: null };
+      cities.push(city);
+      selectedCityId = id;
+      renderCityList();
+    }
+
+    function selectCity(id) {
+      selectedCityId = id;
+      const city = cities.find(c => c.id === id);
+      if (!city) return;
+      city.marker.setZIndexOffset(1000);
+    }
+
+    // ===== Build Structures =====
+    function canAfford(cost) {
+      return Object.entries(cost).every(([k,v]) => (gameState.resources[k] || 0) >= v);
+    }
+    function payCost(cost) {
+      Object.entries(cost).forEach(([k,v]) => { gameState.resources[k] -= v; });
+      updateResourceUI();
+    }
+
+    function queueBuild(cityId, type) {
+      const city = cities.find(c => c.id === cityId);
+      if (!city) return alert(currentLang === "my" ? "မြို့မရွေးထားပါ" : "No city selected");
+      const def = BUILDINGS[type];
+      if (!def) return;
+      if (!canAfford(def.cost)) return alert(currentLang === "my" ? "အရင်းအမြစ်မလုံလောက်" : "Insufficient resources");
+      payCost(def.cost);
+      const item = { type, timeLeft: def.time };
+      city.buildQueue.push(item);
+      renderBuildQueue();
+    }
+
+    function renderBuildQueue() {
+      const wrap = document.getElementById("buildQueue");
+      wrap.innerHTML = "";
+      const city = cities.find(c => c.id === selectedCityId);
+      if (!city) return;
+      city.buildQueue.forEach((it, idx) => {
+        const pct = Math.max(0, Math.min(100, 100 * (1 - it.timeLeft / BUILDINGS[it.type].time)));
+        const div = document.createElement("div");
+        div.innerHTML = `<strong>${BUILDINGS[it.type].name}</strong>
+          <div class="progress"><span style="width:${pct}%"></span></div>`;
+        wrap.appendChild(div);
+      });
+    }
+
+    function processCityQueues(dt) {
+      // dt ~ seconds scaled by speed
+      cities.forEach(city => {
+        // General production bonus
+        const prodBonus = city.generalId ? (generals.find(g => g.id === city.generalId)?.bonus?.prod || 0) : 0;
+
+        // Apply building yields
+        city.buildings.forEach(b => {
+          const y = BUILDINGS[b].yields || {};
+          Object.entries(y).forEach(([k, base]) => {
+            const inc = base * gameState.speed * (1 + prodBonus);
+            gameState.resources[k] = (gameState.resources[k] || 0) + inc;
+          });
+        });
+
+        // Build queue progress
+        if (city.buildQueue.length > 0) {
+          const current = city.buildQueue[0];
+          current.timeLeft -= dt * gameState.speed;
+          if (current.timeLeft <= 0) {
+            city.buildings.push(current.type);
+            city.buildQueue.shift();
+            renderCityList();
+          }
+        }
+
+        // Production queue (training units)
+        if (city.prodQueue.length > 0) {
+          const job = city.prodQueue[0];
+          job.timeLeft -= dt * gameState.speed * (1 + prodBonus);
+          if (job.timeLeft <= 0) {
+            // produce unit at city position
+            addUnit(city.latlng, city.factionId, "infantry");
+            city.prodQueue.shift();
+            renderUnitList();
+          }
+        }
+      });
+      updateResourceUI();
+      renderBuildQueue();
+    }
+
+    // ===== Training (Units) =====
+    function queueTrainInfantry() {
+      const city = cities.find(c => c.id === selectedCityId);
+      if (!city) return alert(currentLang === "my" ? "မြို့မရွေးထားပါ" : "No city selected");
+      if (!city.buildings.includes("barracks")) {
+        return alert(currentLang === "my" ? "Barracks မရှိပါ" : "Barracks required");
+      }
+      const def = UNIT_TYPES.infantry;
+      if (!canAfford(def.cost)) return alert(currentLang === "my" ? "အရင်းအမြစ်မလုံလောက်" : "Insufficient resources");
+      payCost(def.cost);
+      city.prodQueue.push({ type: "infantry", timeLeft: def.time });
+      renderBuildQueue();
+    }
+
+    // ===== Units =====
+    let unitCounter = 0;
+    function addUnit(latlng = [39.0, -95.0], factionId = "usa", type = "infantry") {
+      const id = ++unitCounter;
+      const iconHtml = `<div class="unit-badge">U${id}</div>`;
+      const icon = L.divIcon({ html: iconHtml, className: "unit-icon", iconSize: [24,24] });
+      const marker = L.marker(latlng, { icon, draggable: false }).addTo(map);
+
+      marker.on("click", () => {
+        selectedUnitId = id;
+        highlightSelected(marker);
+      });
+
+      // Move selected unit on map click
+      map.on("click", e => {
+        if (gameState.mode === "select" && selectedUnitId === id) {
+          moveUnit(marker, e.latlng);
+        }
+      });
+
+      const baseStats = UNIT_TYPES[type].stats;
+      const unit = { id, type, factionId, marker, latlng, generalId: null, stats: {...baseStats} };
+      units.push(unit);
+      renderUnitList();
+    }
+
+    function moveUnit(marker, targetLatLng) {
+      const start = marker.getLatLng();
+      const steps = Math.max(10, Math.floor(40 / gameState.speed));
+      let i = 0;
+      const dx = (targetLatLng.lat - start.lat) / steps;
+      const dy = (targetLatLng.lng - start.lng) / steps;
+      const interval = setInterval(() => {
+        i++;
+        marker.setLatLng([start.lat + dx * i, start.lng + dy * i]);
+        if (i >= steps) clearInterval(interval);
+      }, 25);
+    }
+
+    function highlightSelected(marker) {
+      marker.setZIndexOffset(1000);
+    }
+
+    // ===== Generals =====
+    let generalCounter = 0;
+    function createGeneral(nameInput) {
+      const id = ++generalCounter;
+      const name = (nameInput || "").trim() || (currentLang === "my" ? `ဗိုလ်-${id}` : `General-${id}`);
+      // simple random-ish bonus set
+      const bonus = {
+        atk: 0.10 + Math.random()*0.10,  // 10-20%
+        def: 0.10 + Math.random()*0.10,
+        prod: 0.10 + Math.random()*0.20, // 10-30%
+      };
+      const g = { id, name, factionId: "usa", bonus, assignedTo: null };
+      generals.push(g);
+      renderGeneralList();
+    }
+
+    function assignGeneral(target) {
+      // target: {type:'unit'|'city', id}
+      const available = generals.find(g => !g.assignedTo);
+      if (!available) {
+        return alert(currentLang === "my" ? "ဗိုလ်ချုပ်မရှိ/အားလပ်မရှိ" : "No free generals");
+      }
+      available.assignedTo = target;
+      if (target.type === "unit") {
+        const unit = units.find(u => u.id === target.id);
+        if (unit) {
+          unit.generalId = available.id;
+          // apply buffs
+          unit.stats.atk *= (1 + available.bonus.atk);
+          unit.stats.def *= (1 + available.bonus.def);
+          unit.stats.spd *= (1 + 0.05); // small speed buff
+        }
+      } else if (target.type === "city") {
+        const city = cities.find(c => c.id === target.id);
+        if (city) city.generalId = available.id;
+      }
+      renderGeneralList();
+      renderUnitList();
+      renderCityList();
+    }
+
+    // ===== RTS Loop =====
     function startRTSLoop() {
       if (rtsInterval) clearInterval(rtsInterval);
-      // Tick every 1000ms; scale yields by speed
+      const tickMs = 1000; // base 1s
       rtsInterval = setInterval(() => {
         if (gameState.rtsPaused) return;
+        // Base yields (global)
         const s = gameState.speed;
-        gameState.resources.food += 0.8 * s;
-        gameState.resources.gold += 0.3 * s;
-        gameState.resources.wood += 0.5 * s;
-        gameState.resources.iron += 0.2 * s;
+        gameState.resources.food += 0.2 * s;
+        gameState.resources.gold += 0.1 * s;
+        gameState.resources.wood += 0.2 * s;
+        gameState.resources.iron += 0.05 * s;
+
+        // City/Building yields & queues
+        processCityQueues(tickMs / 1000); // dt seconds
+
         updateResourceUI();
-      }, 1000);
+      }, tickMs);
     }
 
     function updateResourceUI() {
@@ -385,69 +736,16 @@
     }
 
     function endTurn() {
-      // Turn-based resolution hooks (upkeep, events)
-      gameState.resources.food = Math.max(0, gameState.resources.food - 0.5);
-      gameState.resources.wood = Math.max(0, gameState.resources.wood - 0.2);
+      // upkeep (simple)
+      gameState.resources.food = Math.max(0, gameState.resources.food - 0.8 * units.length);
+      gameState.resources.gold = Math.max(0, gameState.resources.gold - 0.2 * units.length);
       gameState.turn++;
       document.getElementById("turnNumber").textContent = gameState.turn;
       nextMonth();
       updateResourceUI();
     }
 
-    // ===== Units =====
-    let unitCounter = 0;
-    function addUnit(latlng = [39.0, -95.0], factionId = "usa") {
-      const id = ++unitCounter;
-      const iconHtml = `<div class="unit-badge">U${id}</div>`;
-      const icon = L.divIcon({ html: iconHtml, className: "unit-icon", iconSize: [24,24] });
-      const marker = L.marker(latlng, { icon, draggable: false }).addTo(map);
-
-      marker.on("click", () => {
-        selectedUnitId = id;
-        highlightSelected(marker);
-      });
-
-      // Move selected unit on map click
-      map.on("click", e => {
-        if (selectedUnitId === id) {
-          moveUnit(marker, e.latlng);
-        }
-      });
-
-      const unit = { id, marker, factionId, latlng };
-      units.push(unit);
-      renderUnitList();
-    }
-
-    function moveUnit(marker, targetLatLng) {
-      const start = marker.getLatLng();
-      const steps = 40;
-      let i = 0;
-      const dx = (targetLatLng.lat - start.lat) / steps;
-      const dy = (targetLatLng.lng - start.lng) / steps;
-      const interval = setInterval(() => {
-        i++;
-        marker.setLatLng([start.lat + dx * i, start.lng + dy * i]);
-        if (i >= steps) clearInterval(interval);
-      }, 25);
-    }
-
-    function highlightSelected(marker) {
-      marker.setZIndexOffset(1000);
-    }
-
-    function renderUnitList() {
-      const list = document.getElementById("unitList");
-      list.innerHTML = "";
-      units.forEach(u => {
-        const ll = u.marker.getLatLng();
-        const li = document.createElement("li");
-        li.textContent = `U${u.id} — ${u.factionId} @ ${ll.lat.toFixed(2)}, ${ll.lng.toFixed(2)}`;
-        list.appendChild(li);
-      });
-    }
-
-    // ===== GeoJSON Load (Placeholder & File) =====
+    // ===== GeoJSON Load =====
     function loadPlaceholderTerritories() {
       try {
         const raw = document.getElementById("placeholderGeoJSON").textContent;
@@ -492,11 +790,24 @@
       document.getElementById("unitsTitle").textContent = t.unitsTitle;
       document.getElementById("addUnitText").textContent = t.addUnitText;
       document.getElementById("legendTitle").textContent = t.legendTitle;
+      document.getElementById("citiesTitle").textContent = t.citiesTitle;
+      document.getElementById("citiesHint").textContent = t.citiesHint;
+      document.getElementById("buildTitle").textContent = t.buildTitle;
+      document.getElementById("buildHint").textContent = t.buildHint;
+      document.getElementById("trainInfantryText").textContent = t.trainInfantryText;
+      document.getElementById("trainHint").textContent = t.trainHint;
+      document.getElementById("generalsTitle").textContent = t.generalsTitle;
+      document.getElementById("createGeneralText").textContent = t.createGeneralText;
+      document.getElementById("assignHint").textContent = t.assignHint;
+
       document.querySelector("footer small").textContent = t.footerText;
       document.getElementById("rtsStatus").textContent =
         gameState.rtsPaused ? t.rtsPaused : t.rtsRunning;
       renderFactionList();
       renderLegend();
+      renderCityList();
+      renderUnitList();
+      renderGeneralList();
     }
 
     function toggleTheme() {
@@ -515,13 +826,34 @@
       baseLayers[value].addTo(map);
     }
 
+    // ===== Map Click Mode Handling =====
+    function onMapClick(e) {
+      const mode = gameState.mode;
+      if (mode === "placeCity") {
+        const name = prompt(currentLang === "my" ? "မြို့အမည်" : "City name");
+        placeCity(e.latlng, name, "usa");
+      } else if (mode === "build") {
+        // Build mode requires clicking a city marker or just use selectedCity
+        const city = cities.find(c => c.id === selectedCityId);
+        if (!city) return alert(currentLang === "my" ? "အရင် မြို့ရွေးပါ" : "Select a city first");
+        // The specific building type is set by clicking a build button (below)
+        alert(currentLang === "my" ? "Build အမျိုးအစားကို sidebar မှ ရွေးပါ" : "Choose a build type in sidebar.");
+      } else if (mode === "train") {
+        queueTrainInfantry();
+      } else if (mode === "assignGeneral") {
+        // Assign to unit if one is selected, else city
+        if (selectedUnitId) assignGeneral({type: "unit", id: selectedUnitId});
+        else if (selectedCityId) assignGeneral({type: "city", id: selectedCityId});
+        else alert(currentLang === "my" ? "Unit/City ရွေးပါ" : "Select a Unit or City");
+      } else {
+        // select/move default handled via unit marker click
+      }
+    }
+
     // ===== Boot =====
     window.addEventListener("DOMContentLoaded", () => {
-      // Restore language if previously saved
       const savedLang = localStorage.getItem("lang");
-      if (savedLang) {
-        currentLang = savedLang;
-      }
+      if (savedLang) currentLang = savedLang;
       document.getElementById("lang").value = currentLang;
 
       initMap();
@@ -529,7 +861,7 @@
       startRTSLoop();
 
       // default unit
-      addUnit([39.0, -95.0], "usa");
+      addUnit([39.0, -95.0], "usa", "infantry");
 
       // UI bindings
       document.getElementById("lang").addEventListener("change", e => {
@@ -549,7 +881,6 @@
 
       document.getElementById("speed").addEventListener("input", e => {
         gameState.speed = parseFloat(e.target.value);
-        // no need to restart interval; scaling inside tick
       });
 
       document.getElementById("startTurnBtn").addEventListener("click", () => {
@@ -559,7 +890,21 @@
       document.getElementById("endTurnBtn").addEventListener("click", endTurn);
 
       document.getElementById("addUnitBtn").addEventListener("click", () => {
-        addUnit([41.0, -87.0], "usa");
+        addUnit([41.0, -87.0], "usa", "infantry");
+      });
+
+      document.getElementById("trainInfantryBtn").addEventListener("click", queueTrainInfantry);
+
+      // Build buttons set selected building type & queue immediately
+      document.querySelectorAll(".buildBtn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const type = btn.dataset.type;
+          if (!selectedCityId) {
+            alert(currentLang === "my" ? "မြို့ရွေးပါ" : "Select a city first");
+            return;
+          }
+          queueBuild(selectedCityId, type);
+        });
       });
 
       document.getElementById("geojsonFile").addEventListener("change", e => {
@@ -570,8 +915,17 @@
       document.getElementById("basemap").addEventListener("change", e => {
         applyBasemap(e.target.value);
       });
+
+      document.getElementById("mode").addEventListener("change", e => {
+        gameState.mode = e.target.value;
+      });
+
+      document.getElementById("createGeneralBtn").addEventListener("click", () => {
+        const name = document.getElementById("newGeneralName").value;
+        createGeneral(name);
+        document.getElementById("newGeneralName").value = "";
+      });
     });
   </script>
 </body>
 </html>
-``
