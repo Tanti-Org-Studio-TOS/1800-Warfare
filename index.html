@@ -2,288 +2,576 @@
 <!DOCTYPE html>
 <html lang="my">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>1800 Warfare: North America</title>
+  <title>မြောက်အမေရိက ၁၈၀၀ — RTS + TBS Strategy</title>
 
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-o9N1j7kGIC1RkG2GQ0Sx0l1rR2z6jZLLANk3GxC6Q8M="
-        crossorigin="anonymous"/>
+  <!-- Leaflet CSS (CDN) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
   <style>
     :root {
-      --bg: #0b1220;
-      --panel: rgba(20,24,30,0.85);
-      --text: #e5e7eb;
-      --accent: #3a86ff;
-      --accent-2: #ef476f;
-      --muted: #94a3b8;
+      --bg: #ffffff;
+      --text: #1c1c1c;
+      --card: #f5f5f7;
+      --border: #dadada;
+      --accent: #0057ff;
+      --accent-2: #0f9d58;
     }
-    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text);
-      font-family: system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans Myanmar",sans-serif;}
-    #map { height: 100vh; }
-    #hud {
-      position: absolute; top: 10px; left: 10px; z-index: 1000;
-      width: 380px; background: var(--panel); backdrop-filter: blur(4px);
-      border-radius: 10px; padding: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    body[data-theme="dark"] {
+      --bg: #0f1115;
+      --text: #eaeaea;
+      --card: #171a21;
+      --border: #2a2e37;
+      --accent: #5aa1ff;
+      --accent-2: #34a853;
     }
-    #hud .row { display: flex; gap: 8px; align-items: center; }
-    #hud .space { justify-content: space-between; }
-    #hud button, #hud select { padding: 6px 10px; border-radius: 6px; border: none; cursor: pointer; }
-    #hud button { background: var(--accent); color: #fff; }
-    #hud button:hover { background: #2f6fd6; }
-    #hud select { background: #0f172a; color: var(--text); border: 1px solid #1f2937; }
-    #log { margin-top: 8px; max-height: 180px; overflow: auto; font-size: 13px; line-height: 1.4;
-      border-top: 1px dashed #334155; padding-top: 6px; }
-    .leaflet-container { background: #091027; }
-    .hidden { display: none; }
-
-    #modal { position: fixed; inset: 0; z-index: 2000; background: rgba(0,0,0,0.55);
-      display: grid; place-items: center; }
-    .modal-card { width: min(520px, 92vw); background: #fff; color: #222;
-      border-radius: 12px; padding: 16px; box-shadow: 0 12px 28px rgba(0,0,0,0.35); }
-    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px; }
-    .modal-actions #conquerBtn { background: var(--accent-2); color: #fff; }
-    .modal-actions #closeModalBtn { background: #eee; }
-    .legend {
-      display:flex; gap:8px; align-items:center; font-size:13px; margin-top:6px; color: var(--muted);
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, "Myanmar Khyay", "Myanmar Sangam MN", "Noto Sans Myanmar", Roboto, Arial, sans-serif;
     }
-    .key { width:12px; height:12px; border-radius:3px; display:inline-block; }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--card);
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+    }
+    .brand { display: flex; align-items: center; gap: 8px; }
+    .brand .logo { font-weight: 700; }
+    .controls > * { margin-left: 8px; }
+    .switch { display: inline-flex; align-items: center; gap: 6px; }
+    .file-label {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--card); border: 1px dashed var(--border);
+      padding: 4px 8px; border-radius: 6px; cursor: pointer;
+    }
+    .file-label input { display: none; }
+    main {
+      display: grid; grid-template-columns: 320px 1fr;
+      height: calc(100vh - 56px);
+    }
+    #sidebar { overflow: auto; border-right: 1px solid var(--border); background: var(--bg); }
+    .panel { padding: 12px; border-bottom: 1px solid var(--border); }
+    #map { height: 100%; width: 100%; }
+    button, select, input {
+      color: var(--text); background: var(--card); border: 1px solid var(--border);
+      border-radius: 6px; padding: 6px 8px;
+    }
+    button:hover { border-color: var(--accent); }
+    #legend { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .legend-item { display: flex; align-items: center; gap: 8px; }
+    .swatch { width: 16px; height: 16px; border-radius: 3px; border: 1px solid var(--border); }
+    .unit-badge {
+      background: var(--accent); color: white; padding: 2px 6px; border-radius: 8px;
+      border: 1px solid rgba(0,0,0,0.2); font-size: 12px;
+    }
+    footer { padding: 6px 12px; border-top: 1px solid var(--border); background: var(--card); }
   </style>
 </head>
-<body>
-  <!-- HUD -->
-  <div id="hud" role="region" aria-label="Game HUD">
-    <div class="row space">
-      <div><strong>ချိန်</strong>: <span id="clock">00:00</span></div>
-      <div><strong>ငွေ</strong>: <span id="coins">0</span></div>
-      <div><strong>စွမ်းအား</strong>: <span id="menpower">0</span></div>
-      <div><strong>ပိုင်နယ်နိမိတ်</strong>: <span id="ownedCount">0</span></div>
+<body data-theme="light">
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">⛯</span>
+      <span id="title">မြောက်အမေရိက ၁၈၀၀ — ရုပ်ရှင်နဲ့အောင်စွမ်း RTS + TBS</span>
     </div>
-    <div class="row space">
-      <div style="display:flex; gap:8px;">
-        <button id="endTurnBtn">End Turn</button>
-        <button id="resetBtn">Reset</button>
-      </div>
-      <!-- ✅ Test Modal button -->
-      <button id="testModalBtn" title="Press M to open">Test Modal</button>
+    <div class="controls">
+      <select id="lang">
+        <option value="my">မြန်မာ</option>
+        <option value="en">English</option>
+      </select>
+
+      <button id="themeToggle">☀️ Light</button>
+
+      <label class="switch">
+        <input type="checkbox" id="pauseRTS">
+        <span id="pauseRTSLabel">RTS ပိတ်ထား</span>
+      </label>
+
+      <label>
+        <span id="speedLabel">အမြန်နှုန်း</span>
+        <input type="range" id="speed" min="0.25" max="3" step="0.25" value="1">
+      </label>
+
+      <button id="startTurnBtn">🏁 <span id="startTurnText">Turn စ</span></button>
+      <button id="endTurnBtn">⏭ <span id="endTurnText">Turn ပြီး</span></button>
+
+      <label class="file-label">
+        <input type="file" id="geojsonFile" accept=".geojson,.json" />
+        <span id="loadGeoJSONText">GeoJSON တင်</span>
+      </label>
+
+      <select id="basemap">
+        <option value="osm">OpenStreetMap</option>
+        <option value="opentopo">OpenTopoMap</option>
+      </select>
     </div>
-    <div class="legend" aria-label="Legend">
-      <span class="key" style="background:#3a86ff"></span> Player
-      <span class="key" style="background:#ef476f; margin-left:10px;"></span> AI
-      <span class="key" style="background:#94a3b8; margin-left:10px;"></span> Neutral
+  </header>
+
+  <main>
+    <div id="sidebar">
+      <section class="panel">
+        <h3 id="gameStateTitle">ဂိမ်းအခြေအနေ</h3>
+        <div id="gameState">
+          <div><strong id="turnText">Turn</strong>: <span id="turnNumber">1</span> (<span id="dateText">ဇန် 1800</span>)</div>
+          <div><strong id="rtsText">RTS</strong>: <span id="rtsStatus">ရုပ်ရှင်အလုပ်လုပ်နေ</span></div>
+          <div><strong id="resText">အရင်းအမြစ်</strong>:
+            <ul id="resourceList">
+              <li>Food: <span id="resFood">0.0</span></li>
+              <li>Gold: <span id="resGold">0.0</span></li>
+              <li>Wood: <span id="resWood">0.0</span></li>
+              <li>Iron: <span id="resIron">0.0</span></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h3 id="factionsTitle">Faction များ</h3>
+        <ul id="factionList"></ul>
+      </section>
+
+      <section class="panel">
+        <h3 id="unitsTitle">ယူနစ်များ</h3>
+        <button id="addUnitBtn">➕ <span id="addUnitText">ယူနစ်ထည့်</span></button>
+        <ul id="unitList"></ul>
+      </section>
+
+      <section class="panel">
+        <h3 id="legendTitle">အရောင် Legend</h3>
+        <div id="legend"></div>
+      </section>
     </div>
-    <div id="log" aria-live="polite"></div>
-  </div>
 
-  <!-- Map -->
-  <div id="map" aria-label="Map of North America in 1800"></div>
+    <div id="map"></div>
+  </main>
 
-  <!-- Modal -->
-  <div id="modal" class="hidden" role="dialog" aria-modal="true">
-    <div class="modal-card">
-      <h3 id="modal-title">သိမ်းမယ်?</h3>
-      <div id="modal-body"></div>
-      <div class="modal-actions">
-        <button id="conquerBtn">Conquer</button>
-        <button id="closeModalBtn" type="button">Cancel</button>
-      </div>
-    </div>
-  </div>
+  <footer>
+    <small id="footerText">
+      Demo build. Territory GeoJSON here is placeholder (not historically accurate). Upload your own 1800-boundaries for authentic gameplay.
+    </small>
+  </footer>
 
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-          integrity="sha256-o9QnB8kV2VQnG6G5Z3zKp0lWJQyqUo4o8GgS5bN3EcQ="
-          crossorigin="anonymous"></script>
+  <!-- Leaflet JS (CDN) -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Turf.js -->
-  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6.5.0/turf.min.js"></script>
+  <!-- Placeholder GeoJSON embedded inline -->
+  <script id="placeholderGeoJSON" type="application/json">
+  {
+    "type": "FeatureCollection",
+    "name": "north_america_1800_placeholder",
+    "features": [
+      {
+        "type": "Feature",
+        "properties": { "name": "United States (approx. east)", "factionId": "usa", "isPlaceholder": true },
+        "geometry": { "type": "Polygon", "coordinates": [[[-90, 37], [-75, 37], [-75, 45], [-90, 45], [-90, 37]]] }
+      },
+      {
+        "type": "Feature",
+        "properties": { "name": "New Spain (approx.)", "factionId": "newspain", "isPlaceholder": true },
+        "geometry": { "type": "Polygon", "coordinates": [[[-110, 25], [-95, 25], [-95, 32], [-110, 32], [-110, 25]]] }
+      },
+      {
+        "type": "Feature",
+        "properties": { "name": "British (Canada approx.)", "factionId": "british", "isPlaceholder": true },
+        "geometry": { "type": "Polygon", "coordinates": [[[-90, 50], [-70, 50], [-70, 57], [-90, 57], [-90, 50]]] }
+      },
+      {
+        "type": "Feature",
+        "properties": { "name": "Russian America (Alaska approx.)", "factionId": "russian", "isPlaceholder": true },
+        "geometry": { "type": "Polygon", "coordinates": [[[-160, 55], [-140, 55], [-140, 62], [-160, 62], [-160, 55]]] }
+      },
+      {
+        "type": "Feature",
+        "properties": { "name": "Saint-Domingue (Hispaniola West approx.)", "factionId": "saintdomingue", "isPlaceholder": true },
+        "geometry": { "type": "Polygon", "coordinates": [[[-73.5, 18.5], [-72, 18.5], [-72, 19.5], [-73.5, 19.5], [-73.5, 18.5]]] }
+      },
+      {
+        "type": "Feature",
+        "properties": { "name": "Native Nations (Great Plains approx.)", "factionId": "native", "isPlaceholder": true },
+        "geometry": { "type": "Polygon", "coordinates": [[[-105, 38], [-95, 38], [-95, 46], [-105, 46], [-105, 38]]] }
+      }
+    ]
+  }
+  </script>
 
   <script>
-    // 1800 Warfare: North America (single-file build)
-    const state = {
-      timeSec: 0, coins: 60, men: 30,
-      owners: {},
-      rules: { conquer_base_cost: 10, defense_multiplier: 1.4, men_per_conquer: 6, income_tick_seconds: 12, ai_tick_seconds: 15 },
-      map: null, layer: null, features: [], adjacency: {}, selectedFeature: null
+    // ===== i18n (မြန်မာ / English) =====
+    const i18n = {
+      my: {
+        title: "မြောက်အမေရိက ၁၈၀၀ — ရုပ်ရှင်နဲ့အောင်စွမ်း RTS + TBS",
+        pauseRTSLabel: "RTS ပိတ်ထား",
+        speedLabel: "အမြန်နှုန်း",
+        startTurnText: "Turn စ",
+        endTurnText: "Turn ပြီး",
+        loadGeoJSONText: "GeoJSON တင်",
+        gameStateTitle: "ဂိမ်းအခြေအနေ",
+        turnText: "Turn",
+        dateText: "ရက်စွဲ",
+        rtsText: "RTS",
+        resText: "အရင်းအမြစ်",
+        factionsTitle: "Faction များ",
+        unitsTitle: "ယူနစ်များ",
+        addUnitText: "ယူနစ်ထည့်",
+        legendTitle: "အရောင် Legend",
+        footerText:
+          "Demo build. Territory GeoJSON here is placeholder (not historically accurate). Upload your own 1800-boundaries for authentic gameplay.",
+        rtsRunning: "ရုပ်ရှင်အလုပ်လုပ်နေ",
+        rtsPaused: "ရုပ်ရှင်ပိတ်ထား",
+      },
+      en: {
+        title: "North America 1800 — Strategy (RTS + TBS)",
+        pauseRTSLabel: "RTS Paused",
+        speedLabel: "Speed",
+        startTurnText: "Start Turn",
+        endTurnText: "End Turn",
+        loadGeoJSONText: "Load GeoJSON",
+        gameStateTitle: "Game State",
+        turnText: "Turn",
+        dateText: "Date",
+        rtsText: "RTS",
+        resText: "Resources",
+        factionsTitle: "Factions",
+        unitsTitle: "Units",
+        addUnitText: "Add Unit",
+        legendTitle: "Color Legend",
+        footerText:
+          "Demo build. Territory GeoJSON here is placeholder (not historically accurate). Upload your own 1800-boundaries for authentic gameplay.",
+        rtsRunning: "Running",
+        rtsPaused: "Paused",
+      },
     };
 
-    const $ = (id) => document.getElementById(id);
-    function log(msg){ const el=$("log"); const ts=new Date().toLocaleTimeString(); el.innerHTML=`<div>[${ts}] ${msg}</div>`+el.innerHTML; }
-    function updateHUD(){ $("coins").textContent=state.coins; $("menpower").textContent=state.men;
-      $("ownedCount").textContent=Object.values(state.owners).filter(o=>o==="player").length;
-      $("clock").textContent=new Date(state.timeSec*1000).toISOString().substr(14,5); }
+    // ===== Factions & Colors =====
+    const factions = [
+      { id: "usa", name_my: "အမေရိကန်ပြည်ထောင်စု (၁၈၀၀)", name_en: "United States (1800)", color: "#3a86ff" },
+      { id: "newspain", name_my: "New Spain (စပိန်)", name_en: "New Spain (Spanish Empire)", color: "#ff006e" },
+      { id: "british", name_my: "ဗြိတိသျှ (ကနေဒါ)", name_en: "British (Canada)", color: "#8338ec" },
+      { id: "russian", name_my: "ရုရှား (အယ်လပ်စကာ)", name_en: "Russian (Alaska)", color: "#fb5607" },
+      { id: "saintdomingue", name_my: "Saint-Domingue/ဟေတီ", name_en: "Saint-Domingue/Haiti", color: "#2a9d8f" },
+      { id: "native", name_my: "Native Nations", name_en: "Native Nations", color: "#6a994e" },
+      { id: "neutral", name_my: "အလယ်အလတ်", name_en: "Neutral", color: "#adb5bd" },
+    ];
 
-    const SAVE_KEY="warfare1800-na";
-    function saveGame(){ localStorage.setItem(SAVE_KEY, JSON.stringify({timeSec:state.timeSec,coins:state.coins,men:state.men,owners:state.owners})); }
-    function loadGame(){ const raw=localStorage.getItem(SAVE_KEY); if(!raw) return false;
-      try{ const sv=JSON.parse(raw); state.timeSec=sv.timeSec??0; state.coins=sv.coins??60; state.men=sv.men??30; state.owners=sv.owners??{}; log("Save data loaded."); return true; }
-      catch(e){ console.warn(e); return false; } }
+    let currentLang = "my";
+    let map, baseLayers = {}, territoryLayer;
+    let units = [];
+    let selectedUnitId = null;
 
-    function ownerColor(o){ return o==="player"?"#3a86ff":(o==="ai"?"#ef476f":"#94a3b8"); }
-    function styleFeature(f){ const code=codeOf(f); const owner=state.owners[code]||"neutral";
-      return { color:"#0b1a2a", weight:1, fillColor: ownerColor(owner), fillOpacity:0.55 }; }
+    const gameState = {
+      turn: 1,
+      date: { year: 1800, month: 1 }, // month 1-12
+      rtsPaused: false,
+      speed: 1.0,
+      resources: { food: 0, gold: 0, wood: 0, iron: 0 },
+    };
+    let rtsInterval = null;
 
-    // --- Modal helpers (always closable & relaunchable) ---
-    function openModal(title, bodyHtml, showConquer=false){
-      $("modal-title").textContent=title;
-      $("modal-body").innerHTML=bodyHtml;
-      $("modal").classList.remove("hidden");
-      $("conquerBtn").classList.toggle("hidden", !showConquer);
+    // ===== Map init (Leaflet) =====
+    function initMap() {
+      map = L.map("map", {
+        center: [40.0, -100.0], // North America center-ish
+        zoom: 4,
+        minZoom: 3,
+        maxZoom: 12,
+        worldCopyJump: true,
+      });
+
+      const osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: '&copy; OpenStreetMap contributors',
+      }).addTo(map);
+
+      const opentopo = L.tileLayer(
+        "https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",
+        { attribution: '&copy; OpenStreetMap, SRTM | &copy; OpenTopoMap' }
+      );
+
+      baseLayers = { osm, opentopo };
+
+      territoryLayer = L.geoJSON(null, {
+        style: feature => ({
+          color: "#222",
+          weight: 1,
+          fillColor: getFactionColor(feature?.properties?.factionId),
+          fillOpacity: 0.35,
+        }),
+        onEachFeature: (feature, layer) => {
+          const name = feature.properties?.name || "Unknown";
+          const factionId = feature.properties?.factionId || "neutral";
+          const isPlaceholder = feature.properties?.isPlaceholder ? " (placeholder)" : "";
+          layer.bindPopup(`<strong>${name}</strong><br/>Faction: ${factionId}${isPlaceholder}`);
+          layer.on("click", () => {
+            console.log("Territory clicked:", feature.properties);
+          });
+        },
+      }).addTo(map);
     }
-    function closeModal(){ $("modal").classList.add("hidden"); state.selectedFeature=null; }
-    $("closeModalBtn").addEventListener("click", closeModal);
-    $("modal").addEventListener("click",(e)=>{ if(e.target.id==="modal") closeModal(); });
-    window.addEventListener("keydown",(e)=>{ if(e.key.toLowerCase()==="m"){ // ✅ Shortcut: M
-        openModal("စမ်းသပ် Modal","ဒီ Modal ဟာ Test သာဖြစ်ပြီး Conquer ခလုပ်ကို ဖျောက်ထားပါတယ်။<br>မြေပုံက တစ်ဒေသကို click လုပ်လို့လည်း modal ပေါ်ပါမယ်။", false);
-      } else if (e.key==="Escape"){ closeModal(); }});
 
-    // ✅ Test Modal button
-    $("testModalBtn").addEventListener("click", ()=> {
-      openModal("စမ်းသပ် Modal","ဒီ Modal ဟာ Test သာဖြစ်ပြီး Conquer ခလုပ်ကို ဖျောက်ထားပါတယ်။<br>မြေပုံက တစ်ဒေသကို click လုပ်လို့လည်း modal ပေါ်ပါမယ်။", false);
+    function getFactionColor(id) {
+      const f = factions.find(f => f.id === id);
+      return f ? f.color : "#adb5bd";
+    }
+
+    function renderLegend() {
+      const el = document.getElementById("legend");
+      el.innerHTML = "";
+      factions.forEach(f => {
+        const item = document.createElement("div");
+        item.className = "legend-item";
+        item.innerHTML = `
+          <span class="swatch" style="background:${f.color}"></span>
+          <span>${currentLang === "my" ? f.name_my : f.name_en}</span>
+        `;
+        el.appendChild(item);
+      });
+    }
+
+    function renderFactionList() {
+      const list = document.getElementById("factionList");
+      list.innerHTML = "";
+      factions.forEach(f => {
+        const li = document.createElement("li");
+        li.textContent = currentLang === "my" ? f.name_my : f.name_en;
+        list.appendChild(li);
+      });
+    }
+
+    // ===== Game Loop (RTS + TBS) =====
+    function startRTSLoop() {
+      if (rtsInterval) clearInterval(rtsInterval);
+      // Tick every 1000ms; scale yields by speed
+      rtsInterval = setInterval(() => {
+        if (gameState.rtsPaused) return;
+        const s = gameState.speed;
+        gameState.resources.food += 0.8 * s;
+        gameState.resources.gold += 0.3 * s;
+        gameState.resources.wood += 0.5 * s;
+        gameState.resources.iron += 0.2 * s;
+        updateResourceUI();
+      }, 1000);
+    }
+
+    function updateResourceUI() {
+      document.getElementById("resFood").textContent = gameState.resources.food.toFixed(1);
+      document.getElementById("resGold").textContent = gameState.resources.gold.toFixed(1);
+      document.getElementById("resWood").textContent = gameState.resources.wood.toFixed(1);
+      document.getElementById("resIron").textContent = gameState.resources.iron.toFixed(1);
+    }
+
+    function nextMonth() {
+      gameState.date.month++;
+      if (gameState.date.month > 12) {
+        gameState.date.month = 1;
+        gameState.date.year++;
+      }
+      document.getElementById("dateText").textContent = monthName(gameState.date.month) + " " + gameState.date.year;
+    }
+
+    function monthName(m) {
+      const en = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][m-1];
+      if (currentLang === "my") {
+        const my = ["ဇန်","ဖေ","မတ်","ဧ","မေ","ဇွန်","ဇူ","ဩ","စက်","အောက်","နို","ဒီ"][m-1];
+        return my;
+      }
+      return en;
+    }
+
+    function endTurn() {
+      // Turn-based resolution hooks (upkeep, events)
+      gameState.resources.food = Math.max(0, gameState.resources.food - 0.5);
+      gameState.resources.wood = Math.max(0, gameState.resources.wood - 0.2);
+      gameState.turn++;
+      document.getElementById("turnNumber").textContent = gameState.turn;
+      nextMonth();
+      updateResourceUI();
+    }
+
+    // ===== Units =====
+    let unitCounter = 0;
+    function addUnit(latlng = [39.0, -95.0], factionId = "usa") {
+      const id = ++unitCounter;
+      const iconHtml = `<div class="unit-badge">U${id}</div>`;
+      const icon = L.divIcon({ html: iconHtml, className: "unit-icon", iconSize: [24,24] });
+      const marker = L.marker(latlng, { icon, draggable: false }).addTo(map);
+
+      marker.on("click", () => {
+        selectedUnitId = id;
+        highlightSelected(marker);
+      });
+
+      // Move selected unit on map click
+      map.on("click", e => {
+        if (selectedUnitId === id) {
+          moveUnit(marker, e.latlng);
+        }
+      });
+
+      const unit = { id, marker, factionId, latlng };
+      units.push(unit);
+      renderUnitList();
+    }
+
+    function moveUnit(marker, targetLatLng) {
+      const start = marker.getLatLng();
+      const steps = 40;
+      let i = 0;
+      const dx = (targetLatLng.lat - start.lat) / steps;
+      const dy = (targetLatLng.lng - start.lng) / steps;
+      const interval = setInterval(() => {
+        i++;
+        marker.setLatLng([start.lat + dx * i, start.lng + dy * i]);
+        if (i >= steps) clearInterval(interval);
+      }, 25);
+    }
+
+    function highlightSelected(marker) {
+      marker.setZIndexOffset(1000);
+    }
+
+    function renderUnitList() {
+      const list = document.getElementById("unitList");
+      list.innerHTML = "";
+      units.forEach(u => {
+        const ll = u.marker.getLatLng();
+        const li = document.createElement("li");
+        li.textContent = `U${u.id} — ${u.factionId} @ ${ll.lat.toFixed(2)}, ${ll.lng.toFixed(2)}`;
+        list.appendChild(li);
+      });
+    }
+
+    // ===== GeoJSON Load (Placeholder & File) =====
+    function loadPlaceholderTerritories() {
+      try {
+        const raw = document.getElementById("placeholderGeoJSON").textContent;
+        const gj = JSON.parse(raw);
+        territoryLayer.clearLayers();
+        territoryLayer.addData(gj);
+      } catch (e) {
+        console.warn("Failed to load placeholder territories:", e);
+      }
+    }
+
+    function handleGeoJSONFileInput(file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const gj = JSON.parse(reader.result);
+          territoryLayer.clearLayers();
+          territoryLayer.addData(gj);
+          alert(currentLang === "my" ? "GeoJSON တင်ပြီး!" : "GeoJSON loaded.");
+        } catch (e) {
+          alert(currentLang === "my" ? "GeoJSON မမှန်ပါ!" : "Invalid GeoJSON.");
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // ===== Language & Theme =====
+    function applyLang() {
+      const t = i18n[currentLang];
+      document.getElementById("title").textContent = t.title;
+      document.getElementById("pauseRTSLabel").textContent = t.pauseRTSLabel;
+      document.getElementById("speedLabel").textContent = t.speedLabel;
+      document.getElementById("startTurnText").textContent = t.startTurnText;
+      document.getElementById("endTurnText").textContent = t.endTurnText;
+      document.getElementById("loadGeoJSONText").textContent = t.loadGeoJSONText;
+      document.getElementById("gameStateTitle").textContent = t.gameStateTitle;
+      document.getElementById("turnText").textContent = t.turnText;
+      document.getElementById("dateText").textContent = monthName(gameState.date.month) + " " + gameState.date.year;
+      document.getElementById("rtsText").textContent = t.rtsText;
+      document.getElementById("resText").textContent = t.resText;
+      document.getElementById("factionsTitle").textContent = t.factionsTitle;
+      document.getElementById("unitsTitle").textContent = t.unitsTitle;
+      document.getElementById("addUnitText").textContent = t.addUnitText;
+      document.getElementById("legendTitle").textContent = t.legendTitle;
+      document.querySelector("footer small").textContent = t.footerText;
+      document.getElementById("rtsStatus").textContent =
+        gameState.rtsPaused ? t.rtsPaused : t.rtsRunning;
+      renderFactionList();
+      renderLegend();
+    }
+
+    function toggleTheme() {
+      const body = document.body;
+      const current = body.getAttribute("data-theme");
+      const next = current === "light" ? "dark" : "light";
+      body.setAttribute("data-theme", next);
+      document.getElementById("themeToggle").textContent = next === "light" ? "☀️ Light" : "🌙 Dark";
+    }
+
+    // ===== Basemap Switch =====
+    function applyBasemap(value) {
+      Object.values(baseLayers).forEach(layer => {
+        if (map.hasLayer(layer)) map.removeLayer(layer);
+      });
+      baseLayers[value].addTo(map);
+    }
+
+    // ===== Boot =====
+    window.addEventListener("DOMContentLoaded", () => {
+      // Restore language if previously saved
+      const savedLang = localStorage.getItem("lang");
+      if (savedLang) {
+        currentLang = savedLang;
+      }
+      document.getElementById("lang").value = currentLang;
+
+      initMap();
+      loadPlaceholderTerritories();
+      startRTSLoop();
+
+      // default unit
+      addUnit([39.0, -95.0], "usa");
+
+      // UI bindings
+      document.getElementById("lang").addEventListener("change", e => {
+        currentLang = e.target.value;
+        localStorage.setItem("lang", currentLang);
+        applyLang();
+      });
+      applyLang();
+
+      document.getElementById("themeToggle").addEventListener("click", toggleTheme);
+
+      document.getElementById("pauseRTS").addEventListener("change", e => {
+        gameState.rtsPaused = e.target.checked;
+        document.getElementById("rtsStatus").textContent =
+          gameState.rtsPaused ? i18n[currentLang].rtsPaused : i18n[currentLang].rtsRunning;
+      });
+
+      document.getElementById("speed").addEventListener("input", e => {
+        gameState.speed = parseFloat(e.target.value);
+        // no need to restart interval; scaling inside tick
+      });
+
+      document.getElementById("startTurnBtn").addEventListener("click", () => {
+        alert(currentLang === "my" ? "Turn စတင်ပြီ!" : "Turn started!");
+      });
+
+      document.getElementById("endTurnBtn").addEventListener("click", endTurn);
+
+      document.getElementById("addUnitBtn").addEventListener("click", () => {
+        addUnit([41.0, -87.0], "usa");
+      });
+
+      document.getElementById("geojsonFile").addEventListener("change", e => {
+        const file = e.target.files?.[0];
+        if (file) handleGeoJSONFileInput(file);
+      });
+
+      document.getElementById("basemap").addEventListener("change", e => {
+        applyBasemap(e.target.value);
+      });
     });
-
-    function codeOf(feat){
-      const p=feat.properties||{}; const name=(p.map_label||p.name||"unknown").trim();
-      const bb=turf.bbox(feat); const sig=`${bb[0].toFixed(2)}_${bb[1].toFixed(2)}_${bb[2].toFixed(2)}_${bb[3].toFixed(2)}`;
-      return `${name}-${sig}`;
-    }
-    function areaDefenseIncome(feat){
-      try{ const km2=turf.area(feat)/1_000_000;
-        const defense=Math.max(4, Math.round(Math.log10(km2+10)*6));
-        const income=Math.max(3, Math.round(Math.sqrt(km2)/220));
-        return { defense, income };
-      } catch{ return { defense:5, income:4 }; }
-    }
-    function conquerCost(feat){
-      const base=state.rules.conquer_base_cost||10, mult=state.rules.defense_multiplier||1.4;
-      return Math.ceil(base + areaDefenseIncome(feat).defense * mult);
-    }
-    function canConquer(code){
-      const adj=state.adjacency[code]||[];
-      const hasOwned=adj.some(c=>state.owners[c]==="player");
-      const anyPlayer=Object.values(state.owners).some(v=>v==="player");
-      return hasOwned || !anyPlayer;
-    }
-    function doConquer(code, feat){
-      const cost=conquerCost(feat), menNeed=state.rules.men_per_conquer||6;
-      if(state.coins<cost || state.men<menNeed){ log("ငွေ/စွမ်းား မလုံလောက် — Conquer မအောင်မြင်"); return false; }
-      state.coins-=cost; state.men-=menNeed; state.owners[code]="player";
-      log(`သိမ်းပြီး — ${feat.properties?.map_label||feat.properties?.name||"Unknown"} | cost ${cost}, men ${menNeed}`);
-      refreshLayer(); updateHUD(); saveGame(); return true;
-    }
-
-    function incomeTick(){
-      let add=0; state.features.forEach(f=>{ const code=codeOf(f); if(state.owners[code]==="player") add+=areaDefenseIncome(f).income; });
-      if(add>0){ state.coins+=add; state.men+=Math.ceil(add/3); log(`ဝင်ငွေ +${add} coin, စွမ်းား +${Math.ceil(add/3)}`); }
-      updateHUD(); saveGame();
-    }
-    function aiStep(){
-      const allCodes=state.features.map(f=>codeOf(f));
-      const aiOwned=allCodes.filter(c=>state.owners[c]==="ai");
-      const neutral=allCodes.filter(c=>(state.owners[c]||"neutral")==="neutral");
-      let target=null;
-      if(aiOwned.length===0) target=neutral[Math.floor(Math.random()*neutral.length)];
-      else{
-        const candidates=neutral.filter(nc=>aiOwned.some(ac=>(state.adjacency[ac]||[]).includes(nc)));
-        if(candidates.length) target=candidates[Math.floor(Math.random()*candidates.length)];
-      }
-      if(!target) return;
-      state.owners[target]="ai";
-      const feat=state.features.find(f=>codeOf(f)===target);
-      log(`AI သိမ်းယူ — ${feat?.properties?.map_label||feat?.properties?.name||target}`);
-      refreshLayer(); updateHUD(); saveGame();
-    }
-
-    function buildAdjacency(features){
-      const adj={}; const boxes=features.map(f=>({ code:codeOf(f), bbox:turf.bbox(f) }));
-      for(let i=0;i<features.length;i++){
-        const fi=features[i], ci=codeOf(fi); adj[ci]=adj[ci]||[];
-        for(let j=i+1;j<features.length;j++){
-          const fj=features[j], cj=codeOf(fj);
-          const bbi=boxes[i].bbox, bbj=boxes[j].bbox;
-          const overlap=!(bbj[0]>bbi[2]||bbj[2]<bbi[0]||bbj[1]>bbi[3]||bbj[3]<bbi[1]);
-          if(!overlap) continue;
-          let touch=false; try{ touch=turf.booleanIntersects(fi,fj); }catch{}
-          if(touch){ adj[ci].push(cj); adj[cj]=adj[cj]||[]; adj[cj].push(ci); }
-        }
-      }
-      return adj;
-    }
-    function refreshLayer(){ if(state.layer) state.layer.setStyle(styleFeature); }
-
-    async function fetchWorld1800(){
-      const url="https://raw.githubusercontent.com/aourednik/historical-basemaps/master/geojson/world_1800.geojson";
-      const res=await fetch(url);
-      if(!res.ok) throw new Error("Failed to load world_1800.geojson");
-      return await res.json();
-    }
-    function isNorthAmericaFeature(feat){
-      const [minX,minY,maxX,maxY]=turf.bbox(feat);
-      const width=maxX-minX, height=maxY-minY;
-      const xIn=Math.max(0, Math.min(maxX,-30)-Math.max(minX,-170));
-      const yIn=Math.max(0, Math.min(maxY,83)-Math.max(minY,5));
-      const pct=(xIn/width)*(yIn/height);
-      return Number.isFinite(pct) && pct>0.30;
-    }
-
-    async function init(){
-      try{
-        state.map=L.map("map",{minZoom:3,maxZoom:10,zoomControl:true}).setView([39,-101],4);
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{ attribution:"© OpenStreetMap contributors" }).addTo(state.map);
-
-        const world=await fetchWorld1800();
-        state.features=world.features.filter(isNorthAmericaFeature);
-
-        const gotSave=loadGame();
-        if(!gotSave){
-          state.features.forEach(f=>state.owners[codeOf(f)]="neutral");
-          const r1=state.features[Math.floor(Math.random()*state.features.length)];
-          const r2=state.features[Math.floor(Math.random()*state.features.length)];
-          state.owners[codeOf(r1)]="ai"; state.owners[codeOf(r2)]="ai";
-          saveGame();
-        }
-
-        state.adjacency=buildAdjacency(state.features);
-
-        state.layer=L.geoJSON(state.features,{
-          style:styleFeature,
-          onEachFeature:(feature,layer)=>{
-            const nm=feature.properties?.map_label||feature.properties?.name||"Unknown";
-            const stats=areaDefenseIncome(feature);
-            layer.bindTooltip(nm,{direction:"top"});
-            layer.on("click",()=>{
-              const code=codeOf(feature);
-              const owner=state.owners[code]||"neutral";
-              const cost=conquerCost(feature);
-              if(owner==="player"){
-                openModal(nm,`သင့်ပိုင် (Defense: <strong>${stats.defense}</strong>, Income: <strong>${stats.income}</strong>)`,false);
-              }else if(!canConquer(code)){
-                openModal("Conquer မနိုင်","Player ပိုင်နယ်နိမိတ်နီးပါး မရှိသေးပါ။ (first pick သည် နေရာမရွေးနိုင်)",false);
-              }else{
-                state.selectedFeature=feature;
-                openModal(`သိမ်းမည်: ${nm}`,
-                  `ကုန်ကျစရိတ် <strong>${cost} coin</strong>, စွမ်းအားအသုံး <strong>${state.rules.men_per_conquer}</strong><br/>
-                   Defense: <strong>${stats.defense}</strong>, Income: <strong>${stats.income}</strong>`,
-                  true);
-              }
-            });
-          }
-        }).addTo(state.map);
-
-        updateHUD();
-
-        setInterval(()=>{ state.timeSec+=(state.rules.income_tick_seconds||12); incomeTick(); updateHUD(); },
-          (state.rules.income_tick_seconds||12)*1000);
-        setInterval(()=>{ aiStep(); }, (state.rules.ai_tick_seconds||15)*1000);
-
-        $("endTurnBtn").addEventListener("click",()=>{ state.timeSec+=30; incomeTick(); updateHUD(); });
-        $("resetBtn").addEventListener("click",()=>{ localStorage.removeItem(SAVE_KEY); location.reload(); });
-        $("conquerBtn").addEventListener("click",()=>{ if(!state.selectedFeature) return; const code=codeOf(state.selectedFeature);
-          if(doConquer(code,state.selectedFeature)) closeModal(); });
-
-        log("Loaded North America (circa 1800) historical boundaries. Regions: "+state.features.length);
-      }catch(err){
-        console.error(err);
-        log("⚠️ Load error: Internet connection/Raw dataset unavailable.
+  </script>
+</body>
+</html>
+``
